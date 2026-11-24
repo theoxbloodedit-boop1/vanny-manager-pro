@@ -1,5 +1,4 @@
 import {
-  type AnyPgColumn,
   pgTable,
   uuid,
   text,
@@ -8,10 +7,12 @@ import {
   timestamp,
   index,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { cashSessionStatusEnum, currencyEnum } from "./enums";
 import { branches, organizations } from "./org";
+import { tenantIsolationPolicy } from "./rls";
 
 /**
  * CASH — CTO Decision 3 (revised).
@@ -24,16 +25,19 @@ import { branches, organizations } from "./org";
  *   cash session       →  `cash_sessions`     one cashier's shift on one register,
  *                                             in ONE currency
  *
- * Therefore: a branch may have many registers; each register holds a separate
- * USD balance and a separate CDF balance; and at most ONE open session exists
- * per (register, currency) at any moment.
+ * At most ONE open session exists per (register, currency), enforced by a
+ * partial unique index at the database level.
  */
 export const cashRegisters = pgTable(
   "cash_registers",
   {
     id: uuid("id").primaryKey(),
-    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
-    branchId: uuid("branch_id").notNull().references(() => branches.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
     /** Human label, e.g. "Caisse 1", "Bar drawer". */
     name: text("name").notNull(),
     /** Short code printed on receipts, e.g. "C1". */
@@ -44,16 +48,21 @@ export const cashRegisters = pgTable(
   (t) => [
     uniqueIndex("cash_registers_org_code_uq").on(t.orgId, t.code),
     index("cash_registers_branch_idx").on(t.branchId),
+    tenantIsolationPolicy(t.orgId),
   ],
-);
+).enableRLS();
 
 export const cashSessions = pgTable(
   "cash_sessions",
   {
     id: uuid("id").primaryKey(),
-    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
     branchId: uuid("branch_id").notNull().references(() => branches.id),
-    registerId: uuid("register_id").notNull().references(() => cashRegisters.id),
+    registerId: uuid("register_id")
+      .notNull()
+      .references(() => cashRegisters.id),
     currency: currencyEnum("currency").notNull(),
     /** Better Auth member id of the cashier working this session. */
     cashierMemberId: text("cashier_member_id").notNull(),
@@ -74,7 +83,9 @@ export const cashSessions = pgTable(
      * register + currency, A's session closes and B's opens with this set.
      * The chain is auditable: each session points at its predecessor.
      */
-    handoverFromSessionId: uuid("handover_from_session_id").references((): AnyPgColumn => cashSessions.id),
+    handoverFromSessionId: uuid("handover_from_session_id").references(
+      (): AnyPgColumn => cashSessions.id,
+    ),
     note: text("note"),
   },
   (t) => [
@@ -87,8 +98,9 @@ export const cashSessions = pgTable(
       .where(sql`${t.status} = 'open'`),
     index("cash_session_branch_open_idx").on(t.branchId, t.openedAt),
     index("cash_session_register_idx").on(t.registerId),
+    tenantIsolationPolicy(t.orgId),
   ],
-);
+).enableRLS();
 
 export type CashRegister = typeof cashRegisters.$inferSelect;
 export type CashSession = typeof cashSessions.$inferSelect;

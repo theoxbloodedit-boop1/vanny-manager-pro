@@ -1,5 +1,5 @@
 {
-  "id": "914a36bd-d493-4b6f-85b0-e64849e5c371",
+  "id": "9db6af7a-ea28-44cb-8165-a29be04d728e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -108,9 +108,20 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"branches\".\"org_id\" = current_setting('app.org_id', true)::uuid",
+          "withCheck": "\"branches\".\"org_id\" = current_setting('app.org_id', true)::uuid"
+        }
+      },
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.organizations": {
       "name": "organizations",
@@ -220,9 +231,20 @@
           ]
         }
       },
-      "policies": {},
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"organizations\".\"id\" = current_setting('app.org_id', true)::uuid",
+          "withCheck": "\"organizations\".\"id\" = current_setting('app.org_id', true)::uuid"
+        }
+      },
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.categories": {
       "name": "categories",
@@ -328,9 +350,20 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"categories\".\"org_id\" = current_setting('app.org_id', true)::uuid",
+          "withCheck": "\"categories\".\"org_id\" = current_setting('app.org_id', true)::uuid"
+        }
+      },
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.product_prices": {
       "name": "product_prices",
@@ -338,6 +371,12 @@
       "columns": {
         "product_id": {
           "name": "product_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "org_id": {
+          "name": "org_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -384,18 +423,35 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "product_prices_org_idx": {
+          "name": "product_prices_org_idx",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "product_prices_product_id_products_id_fk": {
-          "name": "product_prices_product_id_products_id_fk",
+        "product_prices_product_org_fk": {
+          "name": "product_prices_product_org_fk",
           "tableFrom": "product_prices",
           "tableTo": "products",
           "columnsFrom": [
-            "product_id"
+            "product_id",
+            "org_id"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "org_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -411,9 +467,20 @@
         }
       },
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"product_prices\".\"org_id\" = current_setting('app.org_id', true)::uuid",
+          "withCheck": "\"product_prices\".\"org_id\" = current_setting('app.org_id', true)::uuid"
+        }
+      },
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.products": {
       "name": "products",
@@ -605,10 +672,30 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
+      "uniqueConstraints": {
+        "products_id_org_uq": {
+          "name": "products_id_org_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "org_id"
+          ]
+        }
+      },
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"products\".\"org_id\" = current_setting('app.org_id', true)::uuid",
+          "withCheck": "\"products\".\"org_id\" = current_setting('app.org_id', true)::uuid"
+        }
+      },
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.cash_registers": {
       "name": "cash_registers",
@@ -727,9 +814,20 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"cash_registers\".\"org_id\" = current_setting('app.org_id', true)::uuid",
+          "withCheck": "\"cash_registers\".\"org_id\" = current_setting('app.org_id', true)::uuid"
+        }
+      },
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.cash_sessions": {
       "name": "cash_sessions",
@@ -946,9 +1044,20 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "\"cash_sessions\".\"org_id\" = current_setting('app.org_id', true)::uuid",
+          "withCheck": "\"cash_sessions\".\"org_id\" = current_setting('app.org_id', true)::uuid"
+        }
+      },
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     }
   },
   "enums": {

@@ -2,8 +2,10 @@
 
 African multi-business management SaaS — boutiques, bars, restaurants, hair salons and pharmacies.
 
-> **Status: Phase 0 — foundations.** No business module is implemented yet.
-> There is no dashboard, and deliberately no demo data. See `docs/ROADMAP.md`.
+> **Status: Phase 1a — tenancy foundation.** The multi-tenant schema is live with
+> row-level security, proven by a 13-test suite on a real PostgreSQL server
+> (`tests/integration/`, ADR-0011). Authentication and RBAC are not built yet, and
+> there is no dashboard — deliberately no demo data. See `docs/ROADMAP.md`.
 
 ## Stack
 
@@ -12,7 +14,7 @@ Neon PostgreSQL · Drizzle ORM · Better Auth · Zod · TanStack Query · PWA (S
 
 ## Requirements
 
-- Node.js >= 22
+- Node.js >= 20.9 (CI runs 22)
 - pnpm 10
 - A Neon PostgreSQL project (see `docs/NEON-SETUP.md`)
 
@@ -34,7 +36,9 @@ pnpm dev
 | `pnpm build` | **Production build — `next build --webpack`** |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm lint` | ESLint |
-| `pnpm test` | Vitest |
+| `pnpm test` | All Vitest suites (unit + integration) |
+| `pnpm test:unit` | Unit tests only (money, prices) |
+| `pnpm test:integration` | **Real-PostgreSQL** suite: RLS, FKs, cash invariant (embedded-postgres, no secrets) |
 | `pnpm db:generate` | Generate SQL migration from `src/db/schema` |
 | `pnpm db:migrate` | Apply migrations |
 | `pnpm pwa:guard` | Fail if the service worker is missing or a stub |

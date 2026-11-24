@@ -3,12 +3,12 @@ import { Pool } from "@neondatabase/serverless";
 import * as schema from "./schema";
 
 /**
- * Database client — Phase 0 scaffold.
+ * Database client — platform-level / migration access only.
  *
- * NOTE: this file deliberately does NOT yet provide tenant access.
- * Phase 1 adds `getTenantDb()` in `src/db/tenant.ts`, which is the ONLY way
- * feature code will reach tenant tables (ADR-0001). Until then this module is
- * used for migrations and platform-level queries only.
+ * NOTE: this file deliberately does NOT provide tenant access. `withTenantDb()`
+ * in `src/db/tenant.ts` is the ONLY sanctioned way feature code reaches tenant
+ * tables (ADR-0001). Use this module for migrations, provisioning and platform
+ * queries that legitimately need to cross tenants.
  */
 
 function requireEnv(name: string): string {

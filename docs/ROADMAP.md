@@ -33,8 +33,9 @@ pipeline.
 | 0.8 | Restore Arena access post-private | — | ⛔ **BLOCKED** — needs a token |
 | 0.9 | Scaffold Next 16 + TS 5.9.3 + Tailwind 4 + ESLint | `pnpm verify` green | ✅ **DONE** |
 | 0.10 | Neon project + roles + RLS + extensions | DB round-trip | ⛔ **BLOCKED — owner must provision Neon** |
-| 0.11 | Better Auth spike on a **running** server | login + org + invite proven | ⬜ needs a database |
+| 0.11 | Better Auth spike on a **running** server | login + org + invite proven | ⬜ needs Better Auth wiring (Phase 1) |
 | 0.12 | CI green on a PR | `ci-ok` required check | ⛔ **BLOCKED — no push credentials** |
+| 0.13 | Real-DB integration suite (RLS, FKs, cash invariant) | `tests/integration/` green | ✅ **DONE** — 11/11 on real PostgreSQL (ADR-0011) |
 
 ### Phase 0 evidence already produced (2026-11-24)
 
@@ -44,8 +45,9 @@ pipeline.
 | `next build --turbopack` | ⚠️ **EXIT 0 but NO service worker** — silent failure |
 | `tsc --noEmit` (TS **5.9.3**) | ✅ exit 0 — TS 7 rejected by `typescript-eslint` (ADR-0010) |
 | `eslint .` | ✅ exit 0 |
-| `vitest run` | ✅ **15/15 passing** |
-| `drizzle-kit generate` | ✅ 7 tables, 12 FKs |
+| `vitest run` (unit + integration) | ✅ **26/26 passing** — 15 unit + 11 on real PostgreSQL |
+| `drizzle-kit generate` | ✅ 7 tables, 12 FKs, 7 RLS policies |
+| Real-DB migration apply | ✅ fresh server, correct order (fixed FK-before-index bug) |
 | `pnpm pwa:guard` | ✅ `sw.js` 41,305 bytes |
 | `drizzle-kit generate` | ✅ correct migration emitted |
 | Better Auth org plugin + custom roles | ✅ **compiles** — open question closed |
@@ -70,18 +72,19 @@ pipeline.
 
 ## Phase 1 — Tenancy, auth, RBAC, organizations, branches
 
-**Not yet authorized.**
+**Authorized** by the CTO master brief (2026-11-24) — building now.
 
-| # | Task |
-|---|---|
-| 1.1 | `getTenantDb()` + `SET LOCAL app.org_id` + RLS on all tenant tables |
-| 1.2 | Permission matrix + `authorize()` |
-| 1.3 | Organization CRUD, **sector** + dual-currency settings + timezone onboarding |
-| 1.4 | Branch CRUD + `member_branch_access` |
-| 1.5 | Staff invitations, role and branch assignment |
-| 1.6 | Org switcher (multiple orgs per owner) |
-| 1.7 | **T4 tenant isolation suite** + RLS catalog verification |
-| 1.8 | Audit log wiring |
+| # | Task | Status |
+|---|---|---|
+| 1.1 | `withTenantDb()` + `SET LOCAL app.org_id` + RLS on all tenant tables | ✅ **DONE** — `src/db/tenant.ts`, policies in `schema/rls.ts`, tested on real PG (ADR-0001/0011) |
+| 1.7 | **T4 tenant isolation suite** (real-DB) | ✅ **DONE** — `tests/integration/isolation.test.ts`, 11/11. RLS catalog verification still open (see 1.7b) |
+| 1.7b | RLS catalog introspection CI test (`pg_policies`) | ⬜ open |
+| 1.2 | Permission matrix + `authorize()` | ⬜ next |
+| 1.3 | Organization CRUD, **sector** + dual-currency settings + timezone onboarding | ⬜ open |
+| 1.4 | Branch CRUD + `member_branch_access` | ⬜ open |
+| 1.5 | Staff invitations, role and branch assignment | ⬜ open |
+| 1.6 | Org switcher (multiple orgs per owner) | ⬜ open |
+| 1.8 | Audit log wiring | ⬜ open |
 
 **Gate 1**
 - [ ] Org A cannot read/write/delete Org B through **any** path — automated.

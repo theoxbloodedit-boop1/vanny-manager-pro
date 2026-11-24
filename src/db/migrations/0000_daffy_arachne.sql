@@ -13,6 +13,7 @@ CREATE TABLE "branches" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "branches" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "organizations" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -28,6 +29,7 @@ CREATE TABLE "organizations" (
 	CONSTRAINT "organizations_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
+ALTER TABLE "organizations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "categories" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"org_id" uuid NOT NULL,
@@ -36,8 +38,10 @@ CREATE TABLE "categories" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "categories" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "product_prices" (
 	"product_id" uuid NOT NULL,
+	"org_id" uuid NOT NULL,
 	"currency" "currency" NOT NULL,
 	"amount_minor" bigint NOT NULL,
 	"updated_by" text,
@@ -45,6 +49,7 @@ CREATE TABLE "product_prices" (
 	CONSTRAINT "product_prices_product_id_currency_pk" PRIMARY KEY("product_id","currency")
 );
 --> statement-breakpoint
+ALTER TABLE "product_prices" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "products" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"org_id" uuid NOT NULL,
@@ -59,9 +64,11 @@ CREATE TABLE "products" (
 	"cost_usd_minor" bigint,
 	"cost_cdf_minor" bigint,
 	"is_active" boolean DEFAULT true NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "products_id_org_uq" UNIQUE("id","org_id")
 );
 --> statement-breakpoint
+ALTER TABLE "products" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "cash_registers" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"org_id" uuid NOT NULL,
@@ -72,6 +79,7 @@ CREATE TABLE "cash_registers" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "cash_registers" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "cash_sessions" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"org_id" uuid NOT NULL,
@@ -90,10 +98,11 @@ CREATE TABLE "cash_sessions" (
 	"note" text
 );
 --> statement-breakpoint
+ALTER TABLE "cash_sessions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "branches" ADD CONSTRAINT "branches_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "categories" ADD CONSTRAINT "categories_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "categories" ADD CONSTRAINT "categories_parent_id_categories_id_fk" FOREIGN KEY ("parent_id") REFERENCES "public"."categories"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "product_prices" ADD CONSTRAINT "product_prices_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "product_prices" ADD CONSTRAINT "product_prices_product_org_fk" FOREIGN KEY ("product_id","org_id") REFERENCES "public"."products"("id","org_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "products" ADD CONSTRAINT "products_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "products" ADD CONSTRAINT "products_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "cash_registers" ADD CONSTRAINT "cash_registers_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -108,6 +117,7 @@ CREATE INDEX "organizations_slug_idx" ON "organizations" USING btree ("slug");--
 CREATE INDEX "categories_org_idx" ON "categories" USING btree ("org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "categories_org_name_uq" ON "categories" USING btree ("org_id","name");--> statement-breakpoint
 CREATE INDEX "product_prices_product_idx" ON "product_prices" USING btree ("product_id");--> statement-breakpoint
+CREATE INDEX "product_prices_org_idx" ON "product_prices" USING btree ("org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "products_org_sku_uq" ON "products" USING btree ("org_id","sku");--> statement-breakpoint
 CREATE INDEX "products_org_barcode_idx" ON "products" USING btree ("org_id","barcode");--> statement-breakpoint
 CREATE INDEX "products_org_updated_idx" ON "products" USING btree ("org_id","updated_at");--> statement-breakpoint
@@ -115,4 +125,11 @@ CREATE UNIQUE INDEX "cash_registers_org_code_uq" ON "cash_registers" USING btree
 CREATE INDEX "cash_registers_branch_idx" ON "cash_registers" USING btree ("branch_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "cash_session_open_uq" ON "cash_sessions" USING btree ("register_id","currency") WHERE "cash_sessions"."status" = 'open';--> statement-breakpoint
 CREATE INDEX "cash_session_branch_open_idx" ON "cash_sessions" USING btree ("branch_id","opened_at");--> statement-breakpoint
-CREATE INDEX "cash_session_register_idx" ON "cash_sessions" USING btree ("register_id");
+CREATE INDEX "cash_session_register_idx" ON "cash_sessions" USING btree ("register_id");--> statement-breakpoint
+CREATE POLICY "tenant_isolation" ON "branches" AS PERMISSIVE FOR ALL TO public USING ("branches"."org_id" = current_setting('app.org_id', true)::uuid) WITH CHECK ("branches"."org_id" = current_setting('app.org_id', true)::uuid);--> statement-breakpoint
+CREATE POLICY "tenant_isolation" ON "organizations" AS PERMISSIVE FOR ALL TO public USING ("organizations"."id" = current_setting('app.org_id', true)::uuid) WITH CHECK ("organizations"."id" = current_setting('app.org_id', true)::uuid);--> statement-breakpoint
+CREATE POLICY "tenant_isolation" ON "categories" AS PERMISSIVE FOR ALL TO public USING ("categories"."org_id" = current_setting('app.org_id', true)::uuid) WITH CHECK ("categories"."org_id" = current_setting('app.org_id', true)::uuid);--> statement-breakpoint
+CREATE POLICY "tenant_isolation" ON "product_prices" AS PERMISSIVE FOR ALL TO public USING ("product_prices"."org_id" = current_setting('app.org_id', true)::uuid) WITH CHECK ("product_prices"."org_id" = current_setting('app.org_id', true)::uuid);--> statement-breakpoint
+CREATE POLICY "tenant_isolation" ON "products" AS PERMISSIVE FOR ALL TO public USING ("products"."org_id" = current_setting('app.org_id', true)::uuid) WITH CHECK ("products"."org_id" = current_setting('app.org_id', true)::uuid);--> statement-breakpoint
+CREATE POLICY "tenant_isolation" ON "cash_registers" AS PERMISSIVE FOR ALL TO public USING ("cash_registers"."org_id" = current_setting('app.org_id', true)::uuid) WITH CHECK ("cash_registers"."org_id" = current_setting('app.org_id', true)::uuid);--> statement-breakpoint
+CREATE POLICY "tenant_isolation" ON "cash_sessions" AS PERMISSIVE FOR ALL TO public USING ("cash_sessions"."org_id" = current_setting('app.org_id', true)::uuid) WITH CHECK ("cash_sessions"."org_id" = current_setting('app.org_id', true)::uuid);

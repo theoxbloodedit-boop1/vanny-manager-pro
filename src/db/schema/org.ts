@@ -10,11 +10,14 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 import { businessSectorEnum, currencyEnum } from "./enums";
+import { tenantIsolationPolicy } from "./rls";
 
 /**
  * Organizations are managed by Better Auth's organization plugin (ADR-0002).
  * This table holds the *business* attributes that Better Auth does not:
  * Better Auth owns identity, membership and roles; we own the business profile.
+ *
+ * It is tenant-scoped by its own primary key, not by an `org_id` column.
  */
 export const organizations = pgTable(
   "organizations",
@@ -32,14 +35,19 @@ export const organizations = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("organizations_slug_idx").on(t.slug)],
-);
+  (t) => [
+    index("organizations_slug_idx").on(t.slug),
+    tenantIsolationPolicy(t.id),
+  ],
+).enableRLS();
 
 export const branches = pgTable(
   "branches",
   {
     id: uuid("id").primaryKey(),
-    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     address: text("address"),
     phone: text("phone"),
@@ -49,5 +57,6 @@ export const branches = pgTable(
   (t) => [
     index("branches_org_idx").on(t.orgId),
     uniqueIndex("branches_org_name_uq").on(t.orgId, t.name),
+    tenantIsolationPolicy(t.orgId),
   ],
-);
+).enableRLS();

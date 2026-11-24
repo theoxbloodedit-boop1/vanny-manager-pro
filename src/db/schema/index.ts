@@ -3,6 +3,7 @@
  * tenant data access must go through `getTenantDb()` (ADR-0001).
  */
 export * from "./enums";
+export * from "./rls";
 export * from "./org";
 export * from "./catalog";
 export * from "./cash";
