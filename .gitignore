@@ -1,0 +1,58 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# production
+build/
+dist/
+
+# environment — never commit real values
+.env
+.env.*
+!.env.example
+*.local
+
+# secrets — belt and braces
+*.pem
+*.key
+secrets/
+.vercel
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# testing
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# local tooling
+.DS_Store
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.turbo/
+.cache/
+
+# serwist output is generated at build time
+public/sw.js
+public/swe-worker-*.js
+
+# temporary verification harness
+compat-check/
+
+# typescript incremental build info
+*.tsbuildinfo
