@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
 import { uuidv7 } from "../lib/uuid";
-import { sendVerificationEmail } from "../server/email";
+import { sendPasswordResetEmail, sendVerificationEmail } from "../server/email";
 import { orgAccessControl, orgRoles } from "../server/rbac/org-roles";
 import {
   accounts,
@@ -66,17 +66,10 @@ export function createAuth() {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
-      // Labeled development transport (SECURITY.md §5): until Phase 4 wires
-      // Resend, reset tokens are logged server-side. The flow itself (token
-      // creation, validation, password change) is real and tested; only the
-      // delivery leg is a placeholder. Invitation emails work the same way —
-      // the invitation record and acceptance flow are fully functional.
-      sendResetPassword: async ({ user, url }) => {
-        if (process.env.NODE_ENV === "test") return;
-        console.info(
-          `[auth:dev-transport] Password reset for ${user.email}: ${url}`,
-        );
-      },
+      // Delivery leg (ADR-0013/0014): same transport split as verification —
+      // none (default) / resend (optional) / capture (tests). The token in
+      // `url` is signed by Better Auth and redeemed by the reset endpoint.
+      sendResetPassword: sendPasswordResetEmail,
     },
     plugins: [
       organization({
@@ -84,6 +77,14 @@ export function createAuth() {
         ac: orgAccessControl,
         roles: orgRoles,
         organizationLimit: 5,
+        // ADR-0014: the plugin's built-in email-verification check on the
+        // invitation actions is disabled so that a MANUALLY APPROVED user (no
+        // verified email) can accept. We re-enforce the gate in our own accept
+        // route as `emailVerified OR manuallyApproved` (RLS-scoped). The plugin
+        // STILL enforces invitation-token validity, expiry, single-use,
+        // recipient-email match, and permission control — the link's security
+        // is unchanged. `list-user-invitations` remains email-gated (hard check).
+        requireEmailVerificationOnInvitation: false,
         schema: {
           organization: {
             additionalFields: {

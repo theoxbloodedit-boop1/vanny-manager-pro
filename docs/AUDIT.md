@@ -142,3 +142,82 @@ migration or re-baselining needed. Nothing in the repository constrains the desi
 3. Add `.github/workflows/ci.yml` (typecheck, lint, test, build).
 4. Protect `main`: require PR + green CI + linear history; forbid force-push.
 5. Add branch protection *before* the first feature branch, not after.
+
+---
+
+## 9. Current-State Audit — 2026-11-25
+
+**Scope.** Security + integrity audit of the working state at branch
+`feat/real-email-delivery` (base `fa2902f`, Phase 1b), triggered before the
+production deploy. Covers: gate evidence, the new Resend email transport, a
+secret/credential scan (tree + full history), the repo's brief public window,
+the dependency tree, and repo/remote state.
+
+**Method.** Executed checks only — no claim is made without a command result.
+All gates were re-run fresh for this audit.
+
+### 9.1 Gate evidence (re-run 2026-11-25)
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | ✅ exit 0 |
+| `eslint .` | ✅ exit 0 |
+| `vitest run` | ✅ **73/73** — 6 files (15 prices + 13 permissions + 6 uuid + **12 email (new)** + 13 isolation + 14 auth-tenancy) |
+| `next build --webpack` | ✅ exit 0 — 18 routes, service worker bundled |
+| `pwa:guard` | ✅ `public/sw.js` present (43,059 bytes) |
+
+### 9.2 Findings
+
+| # | Finding | Severity | Where | Status |
+|---|---|---|---|---|
+| F-1 | Resend `fetch` had **no timeout** — in serverless a hung call could consume the function's time budget (Better Auth awaits the hook) | Med (robustness) | `src/server/email.ts` | ✅ **Fixed** — 5 s `AbortSignal.timeout`, overridable via `RESEND_TIMEOUT_MS` |
+| F-2 | `uuid@13.0.0` was a **dead, vulnerable production dependency** (GHSA-w5hq-g745-h8pq) — imported nowhere; UUIDv7 is hand-rolled in `src/lib/uuid.ts` | Med (supply chain) | `package.json` | ✅ **Fixed** — dependency removed; prod tree now vuln-free |
+| F-3 | 5 **dev-only** vulnerabilities (1 critical + 4 moderate): `vitest` (critical = local `vitest --ui` server RCE), `@vitest/mocker` ×2, `esbuild` (via `drizzle-kit`). **None ship to runtime.** | Low (prod) / dev-environment | dev toolchain | ⬜ **Documented** — recommend bumping `vitest` to ≥4.1.12 (clears the critical + 3 moderate) and `drizzle-kit` (pulls newer `esbuild`) |
+| F-4 | Repo was **public** from the initial commit until made private on 2026-11-25; Phase 0/1a/1b code was briefly public | Low (residual) | repo history | ✅ **Mitigated** — now private; verified no secrets/tokens in the exposed commits (see 9.3) |
+| F-5 | Two GitHub tokens (a fine-grained + a classic `repo`+`workflow`) were pasted in conversation | High (credential hygiene) | out-of-band | ⬜ **Action for owner** — revoke both; issue a fine-grained token with short expiry for future pushes |
+| F-6 | `MAIL_TRANSPORT=resend` is now implemented, but `RESEND_API_KEY`/`RESEND_FROM` are **not yet configured** — production cannot deliver email until the owner supplies them | High (launch blocker) | env | ⬜ **Open** — part of deploy (option B) |
+| F-7 | RLS catalog introspection test (ROADMAP 1.7b) not yet implemented | Low | `tests/` | ⬜ Open (tracked) |
+| F-8 | A literal positive+negative test for *each* of the 33 permissions not yet written (matrix invariants + representative integration tests exist) | Low | `tests/` | ⬜ Open (tracked, Gate 1) |
+
+### 9.3 Secret / credential scan (clean)
+
+- **GitHub token patterns** (`ghp_…`, `github_pat_…`, `x-access-token:…`): **0** matches in the working tree; **0** across every commit in history.
+- **Hardcoded `BETTER_AUTH_SECRET`**: none in history (only the documented `openssl rand` generator).
+- **`.env.local`**: not present, not tracked. `.env.example` holds keys only.
+- **Only credential present** anywhere: `tenant_app_pw` — the dev-only embedded-PostgreSQL role (non-secret by design; appears in `bootstrap-dev-db.mts`, `pg-harness.ts`, README). No production secret is in the tree or history.
+- **Public window (F-4):** the commits that were briefly public contain code + the dev-only PG cred only. No production secret, no token, no `.env` values were ever exposed.
+
+### 9.4 Email transport review (`src/server/email.ts`)
+
+- **API key handling:** `RESEND_API_KEY` is sent only in the `Authorization`
+  header; **never logged**. Error logs contain the provider detail (status +
+  name + message) or the network error object — never the key.
+- **XSS:** recipient `name` is HTML-escaped in both email templates (unit-tested
+  with an `<img onerror>` payload). `to` is only in the JSON body, never rendered.
+- **PII:** recipient address + signed URL are logged only by the `log`/`capture`
+  transports (dev/test); the `resend` (prod) transport logs no recipient PII.
+- **Failure semantics:** a delivery failure throws; Better Auth's
+  `runInBackgroundOrAwait` catches and logs it without failing the sign-up
+  response, and the recipient can resend via the built-in
+  `/api/auth/send-verification-email`. No fake success, no orphaned account.
+- **No new dependency:** delivery uses the runtime `fetch` (serverless-safe);
+  `package.json` is unchanged by the email work except the `uuid` removal (F-2).
+
+### 9.5 Repo / remote state
+
+- **Visibility:** private (unauthenticated `GET` → 404).
+- **Remote branches:** `main` (9424c06), `phase-0/foundations` (df4afaf),
+  `phase-1a/rls-tenant-isolation` (f912a0d), `phase-1b/auth-rbac` (fa2902f).
+- **PR #1:** `phase-1b/auth-rbac → main`, open.
+- **Working branch:** `feat/real-email-delivery` (email work uncommitted at audit
+  time; gates green).
+
+### 9.6 Conclusion
+
+The production **runtime** is in a clean state: gates green, no runtime
+vulnerabilities, no secrets in tree or history, and the new email transport is
+safe by construction (key never logged, HTML escaped, no PII in prod logs,
+bounded timeout). The remaining items are **launch prerequisites** (Resend keys,
+Neon — F-6) and **tracked hardening** (F-3 dev-toolchain bump, F-7, F-8), none
+of which block the code from being correct. Credential hygiene (F-5) is an
+owner action.

@@ -23,13 +23,17 @@ import { Pool, type PoolClient } from "pg";
  * parallel. `startPostgres("isolation")` and `startPostgres("auth")` never
  * touch the same files.
  */
+export type SuiteName = "isolation" | "auth" | "approvals";
+
 const PORTS: Record<string, number> = {
   isolation: 55433,
   auth: 55434,
+  approvals: 55435,
 };
 const DATA_DIRS: Record<string, string> = {
   isolation: "/tmp/vanny-pg-integration",
   auth: "/tmp/vanny-pg-auth",
+  approvals: "/tmp/vanny-pg-approvals",
 };
 
 export interface HarnessUrls {
@@ -37,7 +41,7 @@ export interface HarnessUrls {
   APP_URL: string;
 }
 
-export function urlsFor(suite: "isolation" | "auth"): HarnessUrls {
+export function urlsFor(suite: SuiteName): HarnessUrls {
   const port = PORTS[suite];
   return {
     ADMIN_URL: `postgres://postgres:postgres@127.0.0.1:${port}/vanny_integ`,
@@ -56,7 +60,7 @@ const MIGRATIONS_DIR = path.join(
 
 let instance: InstanceType<typeof EmbeddedPostgres> | undefined;
 
-export async function startPostgres(suite: "isolation" | "auth" = "isolation"): Promise<Pool> {
+export async function startPostgres(suite: SuiteName = "isolation"): Promise<Pool> {
   const { ADMIN_URL: adminUrl } = urlsFor(suite);
   const pg = new EmbeddedPostgres({
     databaseDir: DATA_DIRS[suite]!,

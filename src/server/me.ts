@@ -98,19 +98,17 @@ export async function getMe(headers: Headers): Promise<Me> {
  * DEVELOPMENT-ONLY helper: returns the verification URL for the signed-in
  * user's email.
  *
- * Available ONLY when the mail transport is the dev "log" transport and the
- * process is not in production (runbook: production must run a real SMTP
- * provider, where this route is a 404). It never weakens the flow — the
- * URL is the same signed token a real mailbox would deliver; this merely
- * skips the mailbox leg, which a sandbox has no SMTP for.
+ * Available ONLY outside production (it is a hard 404 in production, where a
+ * real provider or manual approval must be used). It never weakens the flow —
+ * the URL is the same signed token a real mailbox would deliver; this merely
+ * skips the mailbox leg, which a sandbox has no provider for. Non-production
+ * records every outbound mail in the outbox (see src/server/email.ts), which
+ * is how this endpoint reads the signed URL.
  */
 export async function devVerificationLink(headers: Headers): Promise<{
   url: string;
 }> {
   if (process.env.NODE_ENV === "production") {
-    throw new ApiError(404, "NOT_FOUND", "Not found");
-  }
-  if (process.env.MAIL_TRANSPORT !== "log") {
     throw new ApiError(404, "NOT_FOUND", "Not found");
   }
   const auth = getAuth();
@@ -120,8 +118,8 @@ export async function devVerificationLink(headers: Headers): Promise<{
     throw new ApiError(409, "ALREADY_VERIFIED", "Email already verified");
   }
 
-  // Trigger a (re)send through the normal pipeline; the log transport
-  // captures the signed URL in the in-memory outbox.
+  // Trigger a (re)send through the normal pipeline; non-production records
+  // the signed URL in the in-memory outbox (see src/server/email.ts).
   await auth.api.sendVerificationEmail({
     body: { email: session.user.email },
     headers,

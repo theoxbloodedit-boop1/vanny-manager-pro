@@ -62,6 +62,7 @@ async function verifyEmail(email: string) {
   const mails = takeCapturedMails().filter((m) => m.to === email);
   if (mails.length === 0) throw new Error(`no verification mail for ${email}`);
   const token = mails[mails.length - 1]!.token;
+  if (!token) throw new Error("verification mail has no token");
   const result = (await getAuth().api.verifyEmail({ query: { token } })) as {
     status: boolean;
   };

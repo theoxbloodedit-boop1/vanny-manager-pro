@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import type { TenantDb } from "../../db/tenant";
-import { members } from "../../db/schema/auth";
+import { members, users } from "../../db/schema/auth";
 import { branchAccess } from "../../db/schema/org";
 import {
   BRANCH_SCOPED,
@@ -23,7 +23,11 @@ import {
  * 403 to avoid org-existence oracle leaks).
  */
 export class AuthorizationError extends Error {
-  readonly reason: "NOT_A_MEMBER" | "FORBIDDEN" | "NO_BRANCH_ACCESS";
+  readonly reason:
+    | "NOT_A_MEMBER"
+    | "FORBIDDEN"
+    | "NO_BRANCH_ACCESS"
+    | "APPROVAL_REVOKED";
   readonly status = 403;
   constructor(reason: AuthorizationError["reason"], message: string) {
     super(message);
@@ -55,6 +59,41 @@ export async function resolveRole(
   return rows[0]?.role ?? null;
 }
 
+/**
+ * ADR-0014 (CTO): approval-contingency check, enforced server-side on EVERY
+ * sensitive operation.
+ *
+ * A user who is NOT email-verified can only hold a NON-owner seat because they
+ * accepted an invitation — which required a manual approval (owners are created
+ * by onboarding, which is not verification-gated, and owners are never
+ * invitable). Such a seat's access is therefore CONTINGENT on the approval
+ * still being in effect. If the approval is revoked, the very next operation is
+ * blocked here — immediately, for an already-active session — WITHOUT removing
+ * the membership or the session (those remain separate, deliberate actions).
+ *
+ * Owners are exempt: their seat came from onboarding, not from an approval.
+ */
+async function ensureApprovalInEffect(db: TenantDb, userId: string): Promise<void> {
+  const rows = await db
+    .select({
+      emailVerified: users.emailVerified,
+      manuallyApproved: users.manuallyApproved,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const u = rows[0];
+  // Missing row for a non-owner member is a data-integrity anomaly (FK on
+  // member.user_id) — fail closed.
+  if (!u || (!u.emailVerified && !u.manuallyApproved)) {
+    throw new AuthorizationError(
+      "APPROVAL_REVOKED",
+      "This account's verification (manual approval) is not in effect; " +
+        "protected operations are blocked.",
+    );
+  }
+}
+
 export async function authorize(
   db: TenantDb,
   ctx: AuthzContext,
@@ -65,6 +104,13 @@ export async function authorize(
       "NOT_A_MEMBER",
       "You are not a member of this organization.",
     );
+  }
+
+  // Non-owner, non-verified members act only while their manual approval is in
+  // effect. Checked on every call so a revocation takes effect immediately.
+  const roles = parseRoleList(roleStr);
+  if (!roles.includes("owner")) {
+    await ensureApprovalInEffect(db, ctx.userId);
   }
 
   if (!roleHasPermission(roleStr, ctx.permission)) {
@@ -97,5 +143,5 @@ export async function authorize(
     }
   }
 
-  return parseRoleList(roleStr)[0] as Role;
+  return roles[0] as Role;
 }

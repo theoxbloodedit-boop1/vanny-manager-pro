@@ -44,6 +44,10 @@ export function getAuthDb(): AuthDb {
       max: Number(process.env.AUTH_POOL_MAX ?? 5),
       connectionTimeoutMillis: 10_000,
     });
+    // A pg Pool emits "error" for IDLE clients (e.g. a server shutdown notice,
+    // PG 57P01) rather than for query failures (those reject as Promises).
+    // Without a listener this becomes an unhandled error; swallow it.
+    pool.on("error", () => {});
     db = drizzle(pool, { schema }) as AuthDb;
   }
   return db;
