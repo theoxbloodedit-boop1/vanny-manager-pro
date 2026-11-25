@@ -4,7 +4,79 @@ All notable changes to VANNY MANAGER PRO are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 the phase system in `docs/ROADMAP.md`.
 
-## [Unreleased] — Phase 1a: tenancy & row-level security
+## [Unreleased] — Phase 1b: identity, onboarding, RBAC (branch `phase-1b/auth-rbac`)
+
+### Added
+- **Real identity stack (Better Auth 1.7.27)** — email+password sign-up/sign-in,
+  httpOnly signed session cookies, and the **organization plugin** mapped onto
+  our `organizations`/`member`/`invitation` tables (ADR-0012). Organization ids
+  are **UUIDv7** (supplied via `beforeCreateOrganization`).
+- **Email verification with a documented transport split** (ADR-0013):
+  the org plugin's verified-email gate is enforced (unverified emails cannot
+  list or accept invitations); transports are `capture` (tests), `log` (dev),
+  `smtp` (production — throws until implemented). A **dev-only**
+  `GET /api/dev/verification-link` completes the flow in sandboxes without SMTP
+  (404 in production and with any non-`log` transport).
+- **Onboarding** — `POST /api/onboarding` + `/onboarding` UI (FR): creates the
+  organization with **sector**, **base currency (USD/CDF)** and **timezone**,
+  the first branch, and the owner's branch access, in one flow.
+  `ALREADY_ONBOARDED` (409) prevents duplicate orgs per account.
+- **Branches** — `GET/POST /api/branches`, branch-access grants
+  (`POST /api/branches/access`, member+branch both validated RLS-scoped), and
+  the `/admin` UI section.
+- **Members & invitations** — `GET /api/members` (with user info),
+  `POST /api/invitations` (role + branch ids; `owner` ungrantable),
+  `POST /api/invitations/accept` / `.../cancel`, `GET /api/invitations/org`.
+  Accepting materializes `branch_access` from the invitation (scoped to the
+  org). Role changes via `POST /api/members/role` with a **last-owner guard**
+  (`400 LAST_OWNER`).
+- **Business permission matrix + `authorize()`** — `src/server/rbac/permissions.ts`
+  (33 permissions, 7 roles, branch-scoped set) as the SOLE business
+  authorization source; `authorize()` runs inside `withTenantDb` so every
+  check is RLS-scoped. Org-management powers live in a **separate layer**
+  (Better Auth access control, `org-roles.ts`).
+- **HTTP layer** — `src/server/http.ts` (uniform error envelope, 5xx logged
+  server-side only) + 11 API routes under `src/app/api/**`, including the
+  Better Auth handler (`/api/auth/[...all]`) and `GET /api/me`.
+- **UI (FR, mobile-first, white/electric-blue/red)** — `/auth`
+  (connexion/inscription), `/post-auth` (vérification → invitation →
+  onboarding), `/onboarding`, `/admin` (membres, rôles, invitations,
+  succursales, accès), refreshed landing page. TanStack Query provider.
+- **Dev database bootstrap** — `scripts/bootstrap-dev-db.mts` (real embedded
+  PostgreSQL on 55432, migrations as owner, `tenant_app` NOBYPASSRLS role).
+- **Tests** — `tests/integration/auth-tenancy.test.ts` (14 tests on real PG:
+  UUIDv7 org, unverified-email gate, invitation→accept→branch_access, RBAC
+  positives/negatives, role-change live, last-owner guard, cross-tenant
+  isolation) and unit suites for the permission matrix (13) and UUIDv7 (6).
+  Total: **61/61** (34 unit + 27 real-DB).
+
+### Changed
+- `session` table gains `active_organization_id` (uuid FK → organizations,
+  `ON DELETE SET NULL`) — required by the org plugin (session-level active
+  org). Migration regenerated (now 14 tables, 10 RLS policies).
+- `organizations` gains `logo` + `metadata` (plugin additional fields).
+- `member` / `invitation` are now **RLS-scoped** tenant views for the
+  application role; the Better Auth connection (owner role) manages them
+  directly (ADR-0012).
+- `pg-harness` supports two parallel suites (ports 55433/55434).
+
+### Fixed
+- **UUIDv7 `format()` dropped the lowest nibble 25% of the time** (a 62-bit
+  `rand_b` needs 16 hex digits when bit 60/61 is set; the 32-char layout then
+  overflowed and `slice` silently truncated). The top two `rand_b` bits now
+  live in the variant digit, per RFC 9562 §5.7. Caught by the new unit tests
+  (monotonicity + 20 000-sample uniqueness).
+
+### Test evidence
+`pnpm typecheck` ✅ · `pnpm lint` ✅ · `pnpm test` **61/61**
+(34 unit + 13 isolation + 14 auth/tenancy on real PostgreSQL) ·
+`pnpm build` ✅ (17 routes). **End-to-end HTTP walk** on `next dev` + real PG:
+signup → verified → onboard → invite → accept → role change → last-owner guard
+→ branch access → 401 unauthenticated (see ADR-0012).
+
+---
+
+## [Phase 1a] — Tenancy & row-level security (committed `f912a0d`)
 
 ### Added
 - **Row-Level Security on every tenant table** — one `tenant_isolation` policy per

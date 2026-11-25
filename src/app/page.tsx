@@ -1,13 +1,13 @@
-import { CircleAlert } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-static";
 
 /**
- * Phase 0 status page.
+ * Page d'accueil (Module A).
  *
- * Deliberately NOT a dashboard. There is no business data to show yet, and a
- * screen full of invented numbers would violate the "no fake analytics" rule.
- * This page states exactly where the project stands and is replaced in Phase 3.
+ * N'est PAS un tableau de bord : il n'y a pas de données métier à afficher
+ * ici (phases 2+). Elle indique l'état réel du produit et mène à la création
+ * de compte. Aucune fonctionnalité inexistante n'est promise.
  */
 export default function HomePage() {
   return (
@@ -17,44 +17,68 @@ export default function HomePage() {
           <span className="text-xl font-bold">V</span>
         </span>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">VANNY MANAGER PRO</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            VANNY MANAGER PRO
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Phase 0 — fondations
+            Gestion multi-activités, d’abord pour la RDC
           </p>
         </div>
       </header>
 
       <section className="rounded-card border border-border bg-surface-raised p-6 shadow-sm">
-        <div className="flex items-start gap-3">
-          <CircleAlert className="mt-0.5 size-5 text-primary" aria-hidden />
-          <div className="space-y-2">
-            <h2 className="font-semibold">Aucun module métier n’est disponible.</h2>
-            <p className="text-sm leading-6 text-muted-foreground">
-              Ce dépôt en est à la phase 0 : outillage, schéma de données et
-              pipeline d’intégration continue. Les ventes, le stock, les clients et
-              les dépenses arrivent aux phases 2 à 4.
-            </p>
-            <p className="text-sm leading-6 text-muted-foreground">
-              Aucune donnée n’est affichée ici parce qu’il n’y en a pas encore —
-              volontairement.
+        <div className="flex flex-col items-start gap-4">
+          <div>
+            <h2 className="font-semibold">
+              Votre boutique, votre bar, votre restaurant — gérés proprement.
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              VANNY MANAGER PRO est une application de gestion pour
+              entrepreneurs africains : ventes, stock, caisses et équipes dans
+              un seul espace, en USD et en CDF, sans les confondre.
             </p>
           </div>
+          <Link
+            href="/auth"
+            className="inline-flex min-h-11 items-center justify-center rounded-control bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+          >
+            Créer un compte
+          </Link>
+          <p className="text-xs text-muted-foreground">
+            Déjà un compte ?{" "}
+            <Link href="/auth" className="font-medium text-primary hover:underline">
+              Se connecter
+            </Link>
+          </p>
         </div>
       </section>
 
       <section className="rounded-card border border-border bg-surface p-6">
-        <h2 className="mb-3 text-sm font-semibold">Ce qui existe déjà</h2>
+        <h2 className="mb-3 text-sm font-semibold">
+          Ce qui est déjà opérationnel
+        </h2>
         <ul className="space-y-2 text-sm text-muted-foreground">
-          <li>Schéma multi-tenant : organisations, succursales, catalogue</li>
-          <li>Tarifs normalisés USD / CDF, jamais convertis silencieusement</li>
-          <li>Caisses physiques distinctes des caissiers et des devises</li>
-          <li>Identifiants UUIDv7 générés côté client (prêt pour le hors-ligne)</li>
-          <li>CI : typecheck, lint, tests, build, garde-fou PWA</li>
+          <li>Comptes, organisations et succursales, multi-tenant isolé</li>
+          <li>Invitations par email avec vérification, rôles et permissions</li>
+          <li>
+            Accès par succursale : chacun ne travaille là où il a le droit
+          </li>
+          <li>
+            Tarifs normalisés USD / CDF, jamais convertis silencieusement
+          </li>
+        </ul>
+        <h2 className="mb-2 mt-5 text-sm font-semibold">
+          En préparation (pas encore annoncé ni utilisable)
+        </h2>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li>Point de vente et caisses (USD et CDF séparés)</li>
+          <li>Stock, transferts inter-succursales, clients et fournisseurs</li>
+          <li>Mode hors-ligne testé sur appareil Android</li>
         </ul>
       </section>
 
       <footer className="text-xs text-muted-foreground">
-        Ne jamais afficher une fonctionnalité qui n’existe pas.
+        Nous n’affichons jamais une fonctionnalité qui n’existe pas.
       </footer>
     </main>
   );

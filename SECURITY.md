@@ -20,25 +20,45 @@ bug, so we rely on all three.
 The runtime role is **not** the table owner and does **not** hold `BYPASSRLS`; only the
 migration role does. Proven in `tests/integration/isolation.test.ts`.
 
-> **Outstanding (tracked, Phase 1b):** a CI catalog-introspection test that fails if a
+> **Outstanding (ROADMAP 1.7b):** a CI catalog-introspection test that fails if a
 > table carrying `org_id` lacks an enabled RLS policy.
 
 ## 2. Authentication & sessions — status
 
-- Library: **Better Auth** (ADR-0002). Organization + custom-role support confirmed at
-  compile level.
-- **Not yet built:** the running login/org/invite flow (needs a provisioned database —
-  a Phase 1 task, ADR/ROADMAP 0.11). No auth endpoint exists in the current build.
-- Passwords will be hashed by the library's standard (argon2id); we will never store
-  passwords in clear text or log them.
+- Library: **Better Auth 1.7.27** (ADR-0002/0012). **Built and verified** on a real
+  server: sign-up/sign-in (argon2id via the library), httpOnly `SameSite=Lax`
+  **signed** session cookies, email verification, organization membership.
+- The session cookie carries a **signed token** (`token.signature`); the raw token
+  alone is rejected by verification. The active organization is stored
+  **per-session** (`session.activeOrganizationId`) and always read server-side.
+- **Email verification is enforced for invitations**: unverified emails cannot list
+  or accept invitations (Better Auth org-plugin control — kept, not bypassed).
+  Delivery transport is environment-dependent (ADR-0013); the verification token
+  flow is always real. A dev-only endpoint
+  (`GET /api/dev/verification-link`) exists for SMTP-less sandboxes and is a
+  **404 in production** and for any non-`log` transport.
+- We never store or log passwords, and never log signed tokens/cookies.
 
 ## 3. Authorization / RBAC — status
 
-- **Not yet built.** The permission matrix and `authorize()` guard are the next Phase 1
-  deliverable (ROADMAP 1.2). Until it exists, no role enforcement is claimed.
-- Design principle: **never trust an `org_id` or `branch_id` from the client.** Every
-  sensitive operation re-checks the caller's membership and permission server-side,
-  independently of the RLS scope.
+- **Built and verified** (ROADMAP 1.2–1.5). Two independent layers:
+  - **Business** — a single `authorize()` entry point over the permission matrix
+    (`src/server/rbac/permissions.ts`), always executed inside `withTenantDb`
+    (RLS-scoped). No `role === "owner"` comparison exists in feature code.
+  - **Org-management** — Better Auth access control (`src/server/rbac/org-roles.ts`)
+    for invite / cancel / role change / delete org. A bug in one layer cannot grant
+    powers of the other.
+- Design principle (enforced): **never trust an `org_id` or `branch_id` from the
+  client.** Every operation re-checks membership and permission server-side, and the
+  active org comes from the session, not the request body.
+- Branch-level access: a member only acts at branches present in `branch_access`
+  (grants materialized from the invitation on accept, or granted by an admin).
+  Reaching an unassigned branch yields **403, not an empty list**.
+- A role change applies on the **next request** (role read from the DB per call);
+  an organization can never be left without an owner (`400 LAST_OWNER`).
+- Residual (honest): a literal positive+negative test for *every* one of the 33
+  permissions is not yet written — matrix invariants + representative integration
+  tests cover the enforcement paths (ROADMAP Gate 1, open item).
 
 ## 4. Secrets & environment
 
@@ -48,6 +68,16 @@ migration role does. Proven in `tests/integration/isolation.test.ts`.
 - Never commit credentials, API keys, or environment secrets.
 - No secret-bearing `NEXT_PUBLIC_*` variable is permitted (CI-enforced).
 - Database and auth values are injected from the platform (Vercel env), never from code.
+- Environment variables in use (names only, see `.env.example`):
+  `DATABASE_URL` (tenant role, RLS-enforced), `AUTH_DATABASE_URL`
+  (schema-owner role for Better Auth; falls back to `DATABASE_URL`),
+  `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `MAIL_TRANSPORT`
+  (`capture` | `log` | `smtp` — ADR-0013), `NEXT_PUBLIC_APP_URL`,
+  `NEXT_PUBLIC_APP_ENV`.
+- **Two-role database split is load-bearing**: the application pool connects as a
+  non-owner role so RLS applies; the Better Auth pool connects as the schema owner.
+  Pointing both at the owner role would silently disable tenant isolation for the
+  identity path — see ADR-0001/0012.
 
 ## 5. Data integrity
 
@@ -63,10 +93,15 @@ migration role does. Proven in `tests/integration/isolation.test.ts`.
 ## 6. Input & injection
 
 - **Drizzle ORM** parameterizes all queries; no string-built SQL in the data path.
-- **Zod** validates untrusted input at every API boundary (to be added with the API
-  layer).
-- **CSRF / XSS:** framework defaults + library mechanisms applied as the API and auth
-  surfaces are built; re-verified at that stage.
+- **Zod** validates every request body at the API boundary
+  (`onboardingSchema`, `branchBody`, `grantBody`, `inviteBody`, `cancelInviteBody`,
+  `roleBody`); the `/api/auth/*` surface is validated inside the Better Auth handler.
+  Invalid input returns a uniform 400 envelope; `ZodError` details are mapped to a
+  short, safe message (no stack leakage to the client).
+- **CSRF / XSS:** httpOnly `SameSite=Lax` signed session cookies (no JS access),
+  JSON-only request bodies, and React's default escaping cover the current surface.
+  The org-management endpoints are additionally gated by server-side access control,
+  so a forged same-site POST cannot change roles or invite members.
 
 ## 7. Reporting vulnerabilities
 

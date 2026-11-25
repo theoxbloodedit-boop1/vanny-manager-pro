@@ -18,10 +18,36 @@ import { Pool, type PoolClient } from "pg";
  *                RLS is enforced on its connections.
  */
 
-export const PG_PORT = 55433;
-const DATA_DIR = "/tmp/vanny-pg-integration";
-export const ADMIN_URL = `postgres://postgres:postgres@127.0.0.1:${PG_PORT}/vanny_integ`;
-export const APP_URL = `postgres://tenant_app:tenant_app_pw@127.0.0.1:${PG_PORT}/vanny_integ`;
+/**
+ * Each suite gets its own server (port + data dir) so suites can run in
+ * parallel. `startPostgres("isolation")` and `startPostgres("auth")` never
+ * touch the same files.
+ */
+const PORTS: Record<string, number> = {
+  isolation: 55433,
+  auth: 55434,
+};
+const DATA_DIRS: Record<string, string> = {
+  isolation: "/tmp/vanny-pg-integration",
+  auth: "/tmp/vanny-pg-auth",
+};
+
+export interface HarnessUrls {
+  ADMIN_URL: string;
+  APP_URL: string;
+}
+
+export function urlsFor(suite: "isolation" | "auth"): HarnessUrls {
+  const port = PORTS[suite];
+  return {
+    ADMIN_URL: `postgres://postgres:postgres@127.0.0.1:${port}/vanny_integ`,
+    APP_URL: `postgres://tenant_app:tenant_app_pw@127.0.0.1:${port}/vanny_integ`,
+  };
+}
+
+// Backwards-compatible exports for the isolation suite.
+export const PG_PORT = PORTS.isolation;
+export const { ADMIN_URL, APP_URL } = urlsFor("isolation");
 
 const MIGRATIONS_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -30,10 +56,11 @@ const MIGRATIONS_DIR = path.join(
 
 let instance: InstanceType<typeof EmbeddedPostgres> | undefined;
 
-export async function startPostgres(): Promise<Pool> {
+export async function startPostgres(suite: "isolation" | "auth" = "isolation"): Promise<Pool> {
+  const { ADMIN_URL: adminUrl } = urlsFor(suite);
   const pg = new EmbeddedPostgres({
-    databaseDir: DATA_DIR,
-    port: PG_PORT,
+    databaseDir: DATA_DIRS[suite]!,
+    port: PORTS[suite]!,
     user: "postgres",
     password: "postgres",
     persistent: false, // deletes the data dir on stop — tests must be repeatable
@@ -44,7 +71,7 @@ export async function startPostgres(): Promise<Pool> {
   await pg.start();
   await pg.createDatabase("vanny_integ");
 
-  const admin = new Pool({ connectionString: ADMIN_URL, max: 4 });
+  const admin = new Pool({ connectionString: adminUrl, max: 4 });
 
   // 1. Apply the real generated migrations, as the schema owner.
   const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort();

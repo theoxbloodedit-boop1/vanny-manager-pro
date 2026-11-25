@@ -25,6 +25,9 @@ export const organizations = pgTable(
     id: uuid("id").primaryKey(),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
+    /** Better Auth fields (written by the organization plugin). */
+    logo: text("logo"),
+    metadata: text("metadata"), // JSON string, managed by Better Auth
     businessSector: businessSectorEnum("business_sector").notNull(),
     baseCurrency: currencyEnum("base_currency").notNull().default("USD"),
     /** CDF has no sub-unit in practice; merchants round change to 50 or 100. */
@@ -57,6 +60,39 @@ export const branches = pgTable(
   (t) => [
     index("branches_org_idx").on(t.orgId),
     uniqueIndex("branches_org_name_uq").on(t.orgId, t.name),
+    tenantIsolationPolicy(t.orgId),
+  ],
+).enableRLS();
+
+/**
+ * Branch-level access grant: which user may operate at which branch.
+ *
+ * The ORG-LEVEL role (owner/admin/manager/cashier/...) lives in Better Auth's
+ * `member` table. This table answers a different question: "is this person
+ * allowed to work AT this branch?" A cashier with no row here for branch B
+ * gets a 403, not an empty list (Gate 1, ADR-0001).
+ *
+ * `userId` references the Better Auth `user` table (text id), so this table
+ * has no typed FK to it (cross-schema string) — integrity is enforced in the
+ * service layer and covered by tests.
+ */
+export const branchAccess = pgTable(
+  "branch_access",
+  {
+    id: uuid("id").primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    grantedBy: text("granted_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("branch_access_branch_user_uq").on(t.branchId, t.userId),
+    index("branch_access_user_idx").on(t.userId),
     tenantIsolationPolicy(t.orgId),
   ],
 ).enableRLS();

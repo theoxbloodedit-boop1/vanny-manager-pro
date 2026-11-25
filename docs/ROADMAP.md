@@ -35,7 +35,7 @@ pipeline.
 | 0.10 | Neon project + roles + RLS + extensions | DB round-trip | ⛔ **BLOCKED — owner must provision Neon** |
 | 0.11 | Better Auth spike on a **running** server | login + org + invite proven | ⬜ needs Better Auth wiring (Phase 1) |
 | 0.12 | CI green on a PR | `ci-ok` required check | ⛔ **BLOCKED — no push credentials** |
-| 0.13 | Real-DB integration suite (RLS, FKs, cash invariant) | `tests/integration/` green | ✅ **DONE** — 11/11 on real PostgreSQL (ADR-0011) |
+| 0.13 | Real-DB integration suite (RLS, FKs, cash invariant) | `tests/integration/` green | ✅ **DONE** — 13/13 on real PostgreSQL (ADR-0011) |
 
 ### Phase 0 evidence already produced (2026-11-24)
 
@@ -45,7 +45,7 @@ pipeline.
 | `next build --turbopack` | ⚠️ **EXIT 0 but NO service worker** — silent failure |
 | `tsc --noEmit` (TS **5.9.3**) | ✅ exit 0 — TS 7 rejected by `typescript-eslint` (ADR-0010) |
 | `eslint .` | ✅ exit 0 |
-| `vitest run` (unit + integration) | ✅ **26/26 passing** — 15 unit + 11 on real PostgreSQL |
+| `vitest run` (unit + integration) | ✅ **61/61 passing** — 34 unit + 27 on real PostgreSQL (13 isolation + 14 auth/tenancy) |
 | `drizzle-kit generate` | ✅ 7 tables, 12 FKs, 7 RLS policies |
 | Real-DB migration apply | ✅ fresh server, correct order (fixed FK-before-index bug) |
 | `pnpm pwa:guard` | ✅ `sw.js` 41,305 bytes |
@@ -77,22 +77,22 @@ pipeline.
 | # | Task | Status |
 |---|---|---|
 | 1.1 | `withTenantDb()` + `SET LOCAL app.org_id` + RLS on all tenant tables | ✅ **DONE** — `src/db/tenant.ts`, policies in `schema/rls.ts`, tested on real PG (ADR-0001/0011) |
-| 1.7 | **T4 tenant isolation suite** (real-DB) | ✅ **DONE** — `tests/integration/isolation.test.ts`, 11/11. RLS catalog verification still open (see 1.7b) |
+| 1.7 | **T4 tenant isolation suite** (real-DB) | ✅ **DONE** — `tests/integration/isolation.test.ts`, 13/13. RLS catalog verification still open (see 1.7b) |
 | 1.7b | RLS catalog introspection CI test (`pg_policies`) | ⬜ open |
-| 1.2 | Permission matrix + `authorize()` | ⬜ next |
-| 1.3 | Organization CRUD, **sector** + dual-currency settings + timezone onboarding | ⬜ open |
-| 1.4 | Branch CRUD + `member_branch_access` | ⬜ open |
-| 1.5 | Staff invitations, role and branch assignment | ⬜ open |
+| 1.2 | Permission matrix + `authorize()` | ✅ **DONE** — `src/server/rbac/permissions.ts` + `authorize.ts`, 13 unit invariants + integration coverage (ADR-0001/0012) |
+| 1.3 | Organization creation, **sector** + base-currency + timezone onboarding | ✅ **DONE** — Better Auth org plugin + `runOnboarding` (ADR-0012); full org CRUD (rename/delete) deferred to SaaS-admin phase |
+| 1.4 | Branch CRUD + `branch_access` | ✅ **DONE** — `src/server/members.ts` (branches + access), tested on real PG |
+| 1.5 | Staff invitations, role and branch assignment | ✅ **DONE** — verified-email-gated invitations, role change, branch grants materialized on accept (ADR-0012/0013) |
 | 1.6 | Org switcher (multiple orgs per owner) | ⬜ open |
 | 1.8 | Audit log wiring | ⬜ open |
 
 **Gate 1**
-- [ ] Org A cannot read/write/delete Org B through **any** path — automated.
-- [ ] Direct SQL with `app.org_id` unset returns 0 rows on every tenant table.
-- [ ] A cashier reaching an unassigned branch gets 403, not an empty list.
-- [ ] Role changes apply on the next request without re-login.
-- [ ] Every permission has ≥1 positive and ≥1 negative test.
-- [ ] RLS catalog check passes: no tenant table is unprotected.
+- [x] Org A cannot read/write/delete Org B through **any** path — automated. *(isolation suite + `auth-tenancy` cross-tenant test: RBAC, RLS and the invitation ledger are all scoped)*
+- [x] Direct SQL with `app.org_id` unset returns 0 rows on every tenant table. *(isolation suite, fail-closed)*
+- [x] A cashier reaching an unassigned branch gets 403, not an empty list. *(explicit `auth-tenancy` test)*
+- [x] Role changes apply on the next request without re-login. *(explicit `auth-tenancy` test)*
+- [ ] Every permission has ≥1 positive and ≥1 negative test. *(partial: structural matrix invariants + representative positive/negative integration tests; a literal per-permission table is still owed)*
+- [ ] RLS catalog check passes: no tenant table is unprotected. *(1.7b)*
 
 ---
 

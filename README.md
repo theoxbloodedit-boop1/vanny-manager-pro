@@ -20,6 +20,8 @@ Neon PostgreSQL · Drizzle ORM · Better Auth · Zod · TanStack Query · PWA (S
 
 ## Setup
 
+### Production / Neon
+
 ```bash
 pnpm install
 cp .env.example .env.local     # fill in DATABASE_URL / DIRECT_URL / BETTER_AUTH_SECRET
@@ -27,6 +29,37 @@ pnpm db:generate               # generate a migration from the schema
 pnpm db:migrate                # apply it (requires DIRECT_URL)
 pnpm dev
 ```
+
+Also set `AUTH_DATABASE_URL` (schema-owner role used by Better Auth) and
+`MAIL_TRANSPORT` — see `.env.example` and ADR-0012/0013.
+
+### Local development (no Neon, no secrets)
+
+A real embedded PostgreSQL is started on port 55432, migrations are applied as
+the owner role, and a `tenant_app` (NOBYPASSRLS) role is created — the same
+split the tests use:
+
+```bash
+pnpm install
+pnpm db:dev                    # starts PG :55432, applies migrations, stays up
+# in .env.local — TWO ROLES (ADR-0012):
+#   DATABASE_URL=postgres://tenant_app:tenant_app_pw@127.0.0.1:55432/vanny
+#   AUTH_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:55432/vanny
+#   BETTER_AUTH_SECRET=<openssl rand -base64 48>
+#   BETTER_AUTH_URL=http://localhost:3000
+#   MAIL_TRANSPORT=log
+pnpm dev
+```
+
+The split is load-bearing: business queries run as `tenant_app` (RLS-enforced),
+while Better Auth must run as the **schema-owner** role (`postgres` here — the
+same role that applied the migrations) because it writes to the RLS-protected
+`member` and `invitation` tables. Pointing `AUTH_DATABASE_URL` at `tenant_app`
+silently breaks invitation/membership writes (RLS `WITH CHECK` rejects them).
+See `src/auth/db.ts`.
+
+With `MAIL_TRANSPORT=log` the dev-only `GET /api/dev/verification-link` lets
+you complete email verification in the browser (it is a 404 in production).
 
 ## Scripts
 
