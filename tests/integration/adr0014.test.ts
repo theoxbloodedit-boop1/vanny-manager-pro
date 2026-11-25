@@ -16,9 +16,13 @@ import {
   myInvitations,
   listBranches,
   listMembers,
+  createBranch,
+  grantBranchAccess,
+  cancelInvitation,
+  changeMemberRole,
 } from "../../src/server/members";
 import { applyManualApproval } from "../../src/server/manual-approval";
-import { withTenantDb } from "../../src/db/tenant";
+import { withTenantDb, getTenantPool } from "../../src/db/tenant";
 import { authorize } from "../../src/server/rbac/authorize";
 import {
   issueOperatorToken,
@@ -207,6 +211,9 @@ beforeAll(async () => {
   process.env.MAIL_TRANSPORT = "none";
   delete process.env.RESEND_API_KEY;
   delete process.env.RESEND_FROM;
+  // Swallow 57P01 (server-shutdown) on idle tenant-pool clients during the
+  // embedded-PG teardown — a teardown artifact, not a test failure.
+  getTenantPool().on("error", () => {});
   void getAuth();
 }, 180_000);
 
@@ -1038,5 +1045,161 @@ describe("ADR-0014 — permission isolation & approval-revocation effect", () =>
       authorize(db, { userId: ou.user.id, permission: "org.settings.manage" }),
     );
     expect(role).toBe("owner");
+  });
+
+  it("authorize() re-reads the approval columns from PostgreSQL on EVERY call (no cache): a direct DB write flips the decision", async () => {
+    const inv = await inviteMember(owner.headers, {
+      email: "eve-reread@example.cd",
+      role: "cashier",
+      branchIds: [branchId],
+    });
+    const eve = await signup("Eve Reread", "eve-reread@example.cd");
+    await applyManualApproval({
+      operatorId: verifiedOperatorId("operator-reread"),
+      userEmail: "eve-reread@example.cd",
+      action: "approve",
+      reason: "approve (test)",
+    });
+    await acceptInvitation(eve.headers, { invitationId: inv.invitationId });
+
+    // While the approval is in effect: the sensitive operation is allowed.
+    await withTenantDb(orgId, (db) =>
+      authorize(db, { userId: eve.user.id, permission: "cash.open", branchId }),
+    );
+
+    // A DIRECT column write in PostgreSQL — no service, no script, no session:
+    // the only thing that can change the decision is the database row itself.
+    await admin.query(
+      `UPDATE "user" SET manually_approved = false WHERE id = $1`,
+      [eve.user.id],
+    );
+
+    // The very next authorization re-reads the column from PostgreSQL and blocks.
+    await expect(
+      withTenantDb(orgId, (db) =>
+        authorize(db, { userId: eve.user.id, permission: "cash.open", branchId }),
+      ),
+    ).rejects.toMatchObject({ reason: "APPROVAL_REVOKED", status: 403 });
+  });
+
+  it("a revocation that commits WHILE a sensitive op is in flight still blocks it (concurrent)", async () => {
+    const inv = await inviteMember(owner.headers, {
+      email: "eve-conc@example.cd",
+      role: "cashier",
+      branchIds: [branchId],
+    });
+    const eve = await signup("Eve Conc", "eve-conc@example.cd");
+    await applyManualApproval({
+      operatorId: verifiedOperatorId("operator-conc"),
+      userEmail: "eve-conc@example.cd",
+      action: "approve",
+      reason: "approve (test)",
+    });
+    await acceptInvitation(eve.headers, { invitationId: inv.invitationId });
+
+    // The request begins: its tenant transaction is OPEN, the authorization has
+    // NOT run yet.
+    await withTenantDb(orgId, async (db) => {
+      // A concurrent actor (separate connection, owner role) revokes NOW and
+      // commits, while the request is in flight.
+      await admin.query(
+        `UPDATE "user" SET manually_approved = false WHERE id = $1`,
+        [eve.user.id],
+      );
+      // READ COMMITTED: the in-flight authorization statement re-reads the
+      // latest committed state — it must see the revocation.
+      await expect(
+        authorize(db, { userId: eve.user.id, permission: "cash.open", branchId }),
+      ).rejects.toMatchObject({ reason: "APPROVAL_REVOKED", status: 403 });
+    });
+
+    // Membership and session remain INTACT (separate, deliberate actions).
+    const mem = await admin.query(
+      `SELECT role FROM member WHERE organization_id = $1 AND user_id = $2`,
+      [orgId, eve.user.id],
+    );
+    expect(mem.rows).toHaveLength(1);
+    const s = await getAuth().api.getSession({ headers: eve.headers });
+    expect(s?.user?.id).toBe(eve.user.id);
+  });
+
+  it("NO BYPASS: every sensitive business function is rejected for a revoked user (403 APPROVAL_REVOKED)", async () => {
+    const inv = await inviteMember(owner.headers, {
+      email: "eve-sweep@example.cd",
+      role: "cashier",
+      branchIds: [branchId],
+    });
+    const eve = await signup("Eve Sweep", "eve-sweep@example.cd");
+    await applyManualApproval({
+      operatorId: verifiedOperatorId("operator-sweep"),
+      userEmail: "eve-sweep@example.cd",
+      action: "approve",
+      reason: "approve (test)",
+    });
+    await acceptInvitation(eve.headers, { invitationId: inv.invitationId });
+    await applyManualApproval({
+      operatorId: verifiedOperatorId("operator-sweep"),
+      userEmail: "eve-sweep@example.cd",
+      action: "revoke",
+      reason: "revoked (test)",
+    });
+    expect((await readFlags("eve-sweep@example.cd")).manuallyApproved).toBe(false);
+
+    // The session is still active — this IS the revocation contract (membership
+    // and session are separate, deliberate actions).
+    const s = await getAuth().api.getSession({ headers: eve.headers });
+    expect(s?.user?.id).toBe(eve.user.id);
+
+    // Every sensitive business operation exposed by the API surface. Each must
+    // be rejected at the SINGLE authorization entry point — before any
+    // business effect — with the machine-readable reason APPROVAL_REVOKED.
+    // Mark rejections as handled at creation time: the promises start
+    // executing immediately, and a rejection that lands before its assertion
+    // is awaited would otherwise surface as an unhandledRejection. The
+    // assertions below still observe the real rejections.
+    const rawOps: Array<[string, Promise<unknown>]> = [
+      [
+        "POST /api/branches (createBranch)",
+        createBranch(eve.headers, { name: "X" }),
+      ],
+      [
+        "POST /api/branches/access (grantBranchAccess)",
+        grantBranchAccess(eve.headers, { branchId, userId: eve.user.id }),
+      ],
+      [
+        "POST /api/invitations (inviteMember)",
+        inviteMember(eve.headers, {
+          email: "ghost-sweep@example.cd",
+          role: "cashier",
+          branchIds: [branchId],
+        }),
+      ],
+      [
+        "POST /api/invitations/cancel (cancelInvitation)",
+        cancelInvitation(eve.headers, {
+          invitationId: "00000000-0000-4000-8000-000000000000",
+        }),
+      ],
+      [
+        "POST /api/members/role (changeMemberRole)",
+        changeMemberRole(eve.headers, {
+          memberId: eve.user.id,
+          role: "cashier",
+        }),
+      ],
+    ];
+    const ops = rawOps.map(([label, p]) => {
+      void p.catch(() => {});
+      return [label, p];
+    });
+    const failures: string[] = [];
+    for (const [label, p] of ops) {
+      try {
+        await expect(p).rejects.toMatchObject({ reason: "APPROVAL_REVOKED" });
+      } catch (e) {
+        failures.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    expect(failures).toEqual([]);
   });
 });

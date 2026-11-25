@@ -343,3 +343,101 @@ approval-contingency check after membership is confirmed:
 ### Execution proof (2026-11-25, cumulative)
 `tsc` 0 · `eslint` 0 · `vitest` **108/108, exit 0, 0 unhandled** · `next build` 0
 (18 routes) · `pwa:guard` OK · migration proof fresh+existing exit 0 (17 tables).
+
+## 13. CTO blocking correction — transaction-local tenant context + RLS hardening (2026-11-25)
+
+**CTO correction (blocking):** in `src/db/tenant.ts`, the tenant-context call
+`set_config('app.org_id', $1, ...)` used `is_local = false`. That is
+**SESSION-level** (it persists on the recycled pooled connection), NOT
+transaction-local. The value **must** be `true`, and the previous code comment
+describing `false` as transaction-local was factually wrong.
+
+### The fix
+`withTenantDb` now issues `set_config('app.org_id', $1, true)`: the setting is
+visible inside the request's transaction and reverted by PostgreSQL at COMMIT
+or ROLLBACK, on that connection. No stale tenant context can ever persist on a
+recycled pooled client (the exact PgBouncer/Neon scenario).
+
+### Executed finding — PostgreSQL 19 restores transaction-local GUCs to `''`
+Probed on a FRESH real server (PostgreSQL 19.0, the product target) with a
+single pooled client:
+
+| State | `current_setting('app.org_id', true)` |
+| --- | --- |
+| fresh connection, no transaction | `NULL` |
+| inside transaction (`is_local=true`) | the org UUID |
+| **after COMMIT** | **`''` (empty string) — not NULL** |
+| **after ROLLBACK** | **`''` (empty string) — not NULL** |
+
+(`pg_db_role_setting` empty — no role/database-level SET involved.)
+
+Consequence: the original RLS predicate
+`org_id = current_setting('app.org_id', true)::uuid` raised
+**22P02 (`invalid input syntax for type uuid: ""`)** on any unscoped RLS read
+performed on a recycled client after such a transaction — and a client left in
+an aborted state poisoned the pool. Fail-closed with zero rows is the
+documented RLS contract; an error is not.
+
+### The hardening (ships atomically with the fix)
+The RLS predicate is now
+
+```sql
+org_col = NULLIF(current_setting('app.org_id', true), '')::uuid
+```
+
+which normalizes **both** reachable states — `NULL` (never set / older servers)
+and `''` (PG19 revert) — to "no tenant in context" → every row filtered,
+zero rows, no error. The three reachable GUC states are fully covered
+(NULL / '' / validated UUID — `withTenantDb` rejects non-UUID org ids before
+any query).
+
+- Schema: `src/db/schema/rls.ts` (single `tenantIsolationPolicy` used by all
+  10 RLS tables).
+- Migration: **`0003_striped_klaw.sql`** (drizzle-kit generated: journal entry
+  + snapshot + 10 `ALTER POLICY` statements).
+- **PG19 grammar note (verified empirically):** `ALTER POLICY ... AS ... FOR
+  ... TO ...` is rejected on 19.0 (syntax error at "AS" and at "FOR"). The
+  generated form `ALTER POLICY ... TO public USING (...) WITH CHECK (...)`
+  applies cleanly (all 10 statements executed on a live 19.0 server); the
+  policy's PERMISSIVE/ALL/public attributes are preserved — only the two
+  expressions are updated.
+
+### Behavior comparison (recycled pooled client, unscoped query)
+| | result |
+| --- | --- |
+| before (`is_local=false`) | **stale tenant's rows (cross-tenant leak)** |
+| after fix, without hardening | 22P02 error + pool poisoning |
+| after fix + hardening | **0 rows — documented fail-closed contract** |
+
+### Tests (integration, real PostgreSQL 19)
+- **New suite `tests/integration/tenant-context.test.ts`** — pool size 1, so
+  every checkout is literally the SAME physical client: (1) org A
+  set-context/query/COMMIT via `withTenantDb`; (2) same client after COMMIT —
+  org A's context no longer active (never `ORG_A`; PG19 reverts to `''`, older
+  servers to `NULL` — both acceptable, asserted); (3) UNSCOPED transaction on
+  the reused client → **0 rows, no error** (the regression `false` allowed);
+  (4) `is_local=true` visible inside the transaction, cleared after COMMIT;
+  (5) same after ROLLBACK, next unscoped transaction still 0 rows; (6) org B
+  on the same recycled client sees only B — never A.
+- **Red→green proof:** against the pre-fix code, 4/6 of these tests FAIL
+  (residual `app.org_id = ORG_A` after COMMIT/ROLLBACK; unscoped read returned
+  A's rows). After the fix: 6/6 pass.
+- **Revocation tests added** (`tests/integration/adr0014.test.ts`, 25 total):
+  `authorize()` re-reads the approval columns from PostgreSQL on every call
+  (a direct owner-role `UPDATE "user" SET manually_approved=false` flips the
+  decision on the next call — no cache/session state); a revocation that
+  commits **while a sensitive op is in flight** still blocks it (READ COMMITTED
+  statement-level re-read), membership + session intact; **NO BYPASS** sweep —
+  every sensitive business function exposed by the API surface
+  (`createBranch`, `grantBranchAccess`, `inviteMember`, `cancelInvitation`,
+  `changeMemberRole`) rejected with `APPROVAL_REVOKED` for a revoked user
+  whose session is still active.
+- **Teardown hygiene:** idle-client `57P01` (server-shutdown) handlers added
+  to the tenant pools in the suites and to the migration-proof pool — a
+  teardown artifact, not a failure.
+
+### Execution proof (2026-11-25, cumulative)
+`tsc` 0 · `eslint` 0 · `vitest` **117/117 (9 files), exit 0, 0 unhandled** ·
+`next build` 0 (18 routes) · `pwa:guard` OK · migration proof **exit 0**
+(A: 107 statements / 4 migrations / 17 tables / trigger active / append-only
+verified; B: base 82 + delta 25 / append-only verified).

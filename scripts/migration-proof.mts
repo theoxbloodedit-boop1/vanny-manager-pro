@@ -45,7 +45,12 @@ async function startPG(port: number, dataDir: string): Promise<{ pg: InstanceTyp
   await pg.initialise();
   await pg.start();
   await pg.createDatabase("migproof");
-  return { pg, pool: new Pool({ connectionString: `postgres://postgres:postgres@127.0.0.1:${port}/migproof`, max: 4 }) };
+  const pool = new Pool({ connectionString: `postgres://postgres:postgres@127.0.0.1:${port}/migproof`, max: 4 });
+  // Swallow 57P01 (server-shutdown) on idle clients during the embedded-PG
+  // teardown — a teardown artifact, not a migration failure. Query errors are
+  // surfaced by the explicit try/catch in the cases below.
+  pool.on("error", () => {});
+  return { pg, pool };
 }
 const one = (r: { rows: unknown[] }): unknown => (r.rows[0] as Record<string, unknown>) ?? {};
 const flat = (m: string) => m.replace(/\s+/g, " ");

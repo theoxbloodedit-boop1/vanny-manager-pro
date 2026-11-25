@@ -10,10 +10,19 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
  * Mechanism
  * ---------
  * 1. Every call runs inside a single transaction on one pooled client.
- * 2. `set_config('app.org_id', $1, false)` scopes that transaction. The
- *    third argument (false) makes the setting LOCAL: it reverts at COMMIT or
- *    ROLLBACK, so a leaked setting can never bleed into another request —
- *    this is what keeps it safe under PgBouncer / Neon pooled connections.
+ * 2. `set_config('app.org_id', $1, true)` is TRANSACTION-LOCAL: the third
+ *    argument (true) makes PostgreSQL revert the setting at COMMIT or
+ *    ROLLBACK, on that connection. With `false` the setting would be
+ *    SESSION-level and persist on the recycled pooled client — a query that
+ *    forgot to scope itself could then read a STALE tenant's rows. `true` is
+ *    what keeps this safe under PgBouncer / Neon pooled connections.
+ *    Proven by tests/integration/tenant-context.test.ts (reused client,
+ *    COMMIT and ROLLBACK paths).
+ *
+ *    NOTE (PG19, ADR-0014 §13): PostgreSQL 19 restores a transaction-local
+ *    custom setting to '' — not NULL — at COMMIT/ROLLBACK. The RLS predicate
+ *    uses NULLIF(current_setting(...), '') so that '' and NULL both mean
+ *    "no tenant in context" → zero rows, never a 22P02 cast error.
  * 3. The RLS policies generated in `src/db/schema/rls.ts` compare every row
  *    against `current_setting('app.org_id', true)`. Unscoped ⇒ NULL ⇒ no rows.
  *    Fail closed.
@@ -83,7 +92,7 @@ export async function withTenantDb<T>(
   const client = await getTenantPool().connect();
   try {
     await client.query("BEGIN");
-    await client.query("SELECT set_config('app.org_id', $1, false)", [orgId]);
+    await client.query("SELECT set_config('app.org_id', $1, true)", [orgId]);
     const db = drizzle(client, { schema }) as TenantDb;
     const result = await fn(db, client);
     await client.query("COMMIT");
