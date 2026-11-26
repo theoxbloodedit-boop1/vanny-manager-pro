@@ -1,41 +1,89 @@
 @import "tailwindcss";
 
 /*
- * VANNY MANAGER PRO — design tokens.
- * White-dominant, electric blue primary, red accent reserved for destructive
- * actions and negative variance only.
+ * VANNY MANAGER PRO — design system v2.
+ *
+ * Direction : "Clair & propre" (famille Blanc Signal, cf. catalogue de
+ * maquettes 2026-11-25). SaaS B2B sérieux : blanche dominée, un bleu
+ * confiné (marque), rouge réservé aux actions destructives et aux
+ * variances négatives, neutres slate. Lisibilité maximale en caisse
+ * (usage toute la journée, environnement clair).
  */
 @theme {
+  /* Neutres */
   --color-background: #ffffff;
   --color-surface: #f6f8fc;
   --color-surface-raised: #ffffff;
+  --color-surface-inset: #f1f4f9;
   --color-border: #e4e9f2;
+  --color-border-strong: #cbd5e1;
   --color-foreground: #0b1220;
-  --color-muted-foreground: #64748b;
+  --color-muted-foreground: #5b6b81;
+  --color-faint-foreground: #8b98ab;
 
+  /* Marque */
   --color-primary: #0b5cff;
-  --color-primary-hover: #0949cc;
+  --color-primary-hover: #0a4fd6;
+  --color-primary-active: #093fb0;
   --color-primary-soft: #eaf0ff;
+  --color-primary-faint: #f4f7ff;
 
+  /* Sémantique */
   --color-accent: #e5252c;
   --color-accent-soft: #fdebec;
-
   --color-success: #12833b;
+  --color-success-soft: #e9f7ef;
   --color-warning: #b45309;
+  --color-warning-soft: #fdf3e7;
+  --color-info: #0e7490;
+  --color-info-soft: #e6f5f9;
 
+  /* Forme */
   --radius-card: 1.25rem;
   --radius-control: 0.75rem;
+  --radius-pill: 999px;
 
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, sans-serif;
+  /* Ombres (douces, SaaS) */
+  --shadow-card: 0 1px 2px rgb(11 18 32 / 0.04), 0 1px 3px rgb(11 18 32 / 0.06);
+  --shadow-pop: 0 4px 12px rgb(11 18 32 / 0.08), 0 2px 4px rgb(11 18 32 / 0.04);
+  --shadow-float: 0 12px 32px rgb(11 18 32 / 0.12), 0 4px 8px rgb(11 18 32 / 0.06);
+
+  /* Typo — next/font injecte --font-jakarta (variable) dans <html> */
+  --font-sans: var(--font-jakarta, "Plus Jakarta Sans"), ui-sans-serif,
+    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 html {
   background: var(--color-background);
   color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-active);
+}
+
+/* Focussabilité clavier cohérente partout (a11y). */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 /* Money must never jitter: tabular figures everywhere amounts are shown. */
 .tabular-nums {
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+/* Champs de saisie : cohérence des contrôles natifs. */
+input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-primary);
 }
