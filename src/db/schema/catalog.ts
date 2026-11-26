@@ -74,6 +74,8 @@ export const products = pgTable(
     /** Cost basis stays here: internal, not customer-facing. */
     costUsdMinor: bigint("cost_usd_minor", { mode: "number" }),
     costCdfMinor: bigint("cost_cdf_minor", { mode: "number" }),
+    /** ADR-0022: product photo (uploaded, data-URL or asset URL). */
+    imageUrl: text("image_url"),
     /**
      * ADR-0018 D6 — low-stock alert threshold (units, per branch). NULL = no
      * alert. The "low" state is DERIVED (branch_stock.qty < threshold), never

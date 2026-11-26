@@ -13,6 +13,7 @@ import {
   Boxes,
   Package,
   KeyRound,
+  Banknote,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import {
@@ -48,6 +49,8 @@ import { CatalogPanel } from "@/components/catalog-panel";
 import { StockPanel } from "@/components/stock-panel";
 import { CategoryManager } from "@/components/category-manager";
 import { BrandingPanel } from "@/components/branding-panel";
+import { VaultPanel } from "@/components/vault-panel";
+import { OrgSelector } from "@/components/org-selector";
 import {
   AdminMobileNav,
   AdminSidebar,
@@ -89,6 +92,16 @@ interface Me {
     brandColor: string | null;
   } | null;
   role?: string | null;
+  permissions?: string[];
+  organizations?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    businessSector: string;
+    logoUrl: string | null;
+    brandName: string | null;
+    isActive: boolean;
+  }>;
 }
 interface Member {
   id: string;
@@ -284,6 +297,15 @@ export default function AdminPage() {
         <AdminMobileNav section={section} onNavigate={setSection} />
 
         <main className="mx-auto w-full max-w-4xl flex-1 space-y-5 p-4 sm:p-6">
+          {/* ADR-0022: multi-activité — switch the active business in one tap. */}
+          <OrgSelector
+            orgs={me.data.organizations ?? []}
+            onSwitch={async (orgId) => {
+              await post("/api/org/switch", { organizationId: orgId });
+              invalidate();
+            }}
+          />
+
           {/* ---- OVERVIEW ---- */}
           {section === "overview" && (
             <div className="space-y-5">
@@ -314,6 +336,7 @@ export default function AdminPage() {
                       { id: "stock" as AdminSection, label: "Stock", icon: Boxes },
                       { id: "team" as AdminSection, label: "Équipe", icon: Users },
                       { id: "branches" as AdminSection, label: "Succursales", icon: Store },
+                      { id: "vault" as AdminSection, label: "Coffre-fort", icon: Banknote },
                       { id: "branding" as AdminSection, label: "Identité", icon: Palette },
                       { id: "overview" as AdminSection, label: "Vue d’ensemble", icon: KeyRound },
                     ]
@@ -734,6 +757,11 @@ export default function AdminPage() {
                 </Card>
               )}
             </div>
+          )}
+
+          {/* ---- VAULT (COFFRE-FORT) ---- */}
+          {section === "vault" && (
+            <VaultPanel permissions={me.data.permissions ?? []} />
           )}
         </main>
       </div>

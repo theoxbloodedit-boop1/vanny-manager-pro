@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getAuthDb } from "../auth/db";
 import { getAuth } from "../auth";
 import { withTenantDb } from "../db/tenant";
@@ -7,7 +7,7 @@ import { organizations } from "../db/schema/org";
 import { ApiError } from "./errors";
 import { takeCapturedMails } from "./email";
 import { isVirtualEmail } from "./phone";
-import { parseRoleList } from "./rbac/permissions";
+import { parseRoleList, ROLE_PERMISSIONS } from "./rbac/permissions";
 
 /**
  * Current-user profile (ROADMAP 1.6) — everything the shell UI needs:
@@ -43,6 +43,21 @@ export interface Me {
     brandColor: string | null;
   } | null;
   role?: string | null;
+  /** ADR-0022: effective business permissions (union over all roles) — the
+   *  UI uses this to gate panels (e.g. vault) instead of role comparisons. */
+  permissions?: string[];
+  /** ADR-0022: ALL organizations the user belongs to (for the multi-activity
+   *  selector — one account, several businesses, one place to manage all). */
+  organizations?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    businessSector: string;
+    baseCurrency: string;
+    logoUrl: string | null;
+    brandName: string | null;
+    isActive: boolean;
+  }>;
 }
 
 export async function getMe(headers: Headers): Promise<Me> {
@@ -160,7 +175,51 @@ export async function getMe(headers: Headers): Promise<Me> {
       .where(eq(members.userId, session.user.id))
       .limit(1),
   );
-  me.role = rows[0] ? (parseRoleList(rows[0].role)[0] ?? null) : null;
+  const roles = rows[0] ? parseRoleList(rows[0].role) : [];
+  me.role = roles[0] ?? null;
+
+  // ADR-0022: expose the effective permission set (union over all roles)
+  // so the UI can gate panels on real permissions, not role names.
+  const perms = new Set<string>();
+  for (const r of roles) {
+    for (const p of ROLE_PERMISSIONS[r]) perms.add(p);
+  }
+  me.permissions = [...perms];
+
+  // ADR-0022 (multi-activité): list ALL organizations the user belongs to,
+  // so one account can manage several businesses from one place. Read via
+  // the auth DB (owner role, platform-level — memberships are the source).
+  const orgRows = await getAuthDb()
+    .select({
+      id: members.organizationId,
+    })
+    .from(members)
+    .where(eq(members.userId, session.user.id));
+  const orgIds = orgRows.map((r) => r.id);
+  if (orgIds.length > 0) {
+    const orgDetails = await getAuthDb()
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+        slug: organizations.slug,
+        businessSector: organizations.businessSector,
+        baseCurrency: organizations.baseCurrency,
+        logoUrl: organizations.logoUrl,
+        brandName: organizations.brandName,
+      })
+      .from(organizations)
+      .where(inArray(organizations.id, orgIds));
+    me.organizations = orgDetails.map((o) => ({
+      id: o.id,
+      name: o.name,
+      slug: o.slug,
+      businessSector: o.businessSector ?? "",
+      baseCurrency: o.baseCurrency ?? "",
+      logoUrl: o.logoUrl ?? null,
+      brandName: o.brandName ?? null,
+      isActive: o.id === orgId,
+    }));
+  }
   return me;
 }
 

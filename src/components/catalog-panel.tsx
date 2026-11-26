@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
+  ImagePlus,
   Package,
   PackagePlus,
   Search,
@@ -51,6 +52,7 @@ interface Product {
   taxFree: boolean;
   categoryId: string | null;
   categoryName: string | null;
+  imageUrl: string | null;
   priceUsdMinor: number | null;
   priceCdfMinor: number | null;
   totalStock: number | null;
@@ -100,6 +102,8 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
   const [taxFree, setTaxFree] = useState(false);
   const [costUsd, setCostUsd] = useState("");
   const [costCdf, setCostCdf] = useState("");
+  // ADR-0022: product photo (data URL, built from the picked file).
+  const [imageData, setImageData] = useState("");
 
   async function run(key: string, fn: () => Promise<unknown>) {
     setBusy(key);
@@ -133,6 +137,7 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
       if (threshold.trim()) body.lowStockThreshold = Number(threshold);
       if (costUsd.trim()) body.costUsdMinor = toMinor(Number(costUsd), "USD");
       if (costCdf.trim()) body.costCdfMinor = toMinor(Number(costCdf), "CDF");
+      if (imageData) body.imageUrl = imageData;
       await postJson("/api/products", body);
       setName("");
       setCategory("");
@@ -145,6 +150,7 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
       setTaxFree(false);
       setCostUsd("");
       setCostCdf("");
+      setImageData("");
       setOpen(false);
     });
   }
@@ -256,6 +262,55 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
                 En franchise de taxe (pharmacie, agro)
               </span>
             </label>
+
+            {/* ADR-0022: product photo */}
+            <div className="space-y-1.5">
+              <span className="text-sm font-semibold text-foreground">
+                Photo du produit (optionnelle)
+              </span>
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 1_500_000) {
+                      setError("Image trop lourde (max 1,5 MB).");
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => setImageData(reader.result as string);
+                    reader.readAsDataURL(file);
+                  }}
+                  className="text-xs text-muted-foreground file:mr-3 file:rounded-control file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-primary"
+                />
+                {imageData ? (
+                  <div className="flex items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imageData}
+                      alt=""
+                      className="size-12 rounded-control object-cover"
+                    />
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 text-xs"
+                      onClick={() => setImageData("")}
+                    >
+                      <X className="size-3.5" />
+                      Retirer
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <ImagePlus className="size-3.5" />
+                    png, jpg, webp ou svg · 1,5 MB max
+                  </span>
+                )}
+              </div>
+            </div>
+
             <ApiErrorText error={error} />
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
@@ -286,7 +341,20 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
                   p.isActive === false ? "opacity-60" : ""
                 }`}
               >
-                <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-3">
+                  {p.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.imageUrl}
+                      alt=""
+                      className="size-11 shrink-0 rounded-control object-cover"
+                    />
+                  ) : (
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-control bg-surface-inset text-muted-foreground">
+                      <Package className="size-4" aria-hidden />
+                    </span>
+                  )}
+                  <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">
                     {p.name}
                     {p.kind === "service" && (
@@ -312,6 +380,7 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
                       .filter(Boolean)
                       .join(" · ") || "—"}
                   </p>
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <div className="text-right text-sm tabular-nums">

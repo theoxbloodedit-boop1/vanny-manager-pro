@@ -12,3 +12,4 @@ export * from "./catalog";
 export * from "./cash";
 export * from "./auth";
 export * from "./platform";
+export * from "./vault";

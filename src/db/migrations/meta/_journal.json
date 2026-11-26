@@ -64,6 +64,13 @@
       "when": 1795712000000,
       "tag": "0009_branding_advanced",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795724000000,
+      "tag": "0010_vault_product_photos",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Banknote,
   Boxes,
   LayoutDashboard,
   LogOut,
@@ -26,7 +27,8 @@ export type AdminSection =
   | "stock"
   | "team"
   | "branches"
-  | "branding";
+  | "branding"
+  | "vault";
 
 interface NavItem {
   id: AdminSection;
@@ -38,6 +40,7 @@ const NAV: NavItem[] = [
   { id: "overview", label: "Vue d'ensemble", icon: LayoutDashboard },
   { id: "catalog", label: "Catalogue", icon: Package },
   { id: "stock", label: "Stock", icon: Boxes },
+  { id: "vault", label: "Coffre-fort", icon: Banknote },
   { id: "team", label: "Équipe", icon: Users },
   { id: "branches", label: "Succursales", icon: Store },
   { id: "branding", label: "Identité", icon: Palette },

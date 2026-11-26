@@ -51,6 +51,10 @@ export const PERMISSIONS = [
   "members.invite",
   "members.manage",
   "audit.view",
+  // vault (coffre-fort, ADR-0022)
+  "vault.view",
+  "vault.deposit",
+  "vault.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -113,6 +117,9 @@ const ADMIN: readonly Permission[] = [
   "branches.manage",
   "members.invite",
   "audit.view",
+  "vault.view",
+  "vault.deposit",
+  "vault.manage",
 ];
 
 const MANAGER: readonly Permission[] = [
@@ -132,6 +139,8 @@ const MANAGER: readonly Permission[] = [
   "expenses.view",
   "reports.view",
   "transfers.manage",
+  "vault.view",
+  "vault.deposit",
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
@@ -158,6 +167,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "cash.view",
     "customers.view",
     "audit.view",
+    "vault.view",
   ],
 };
 

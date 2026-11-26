@@ -23,6 +23,7 @@ import {
 } from "../db/schema/catalog";
 import { uuidv7 } from "../lib/uuid";
 import { ApiError } from "./errors";
+import { validateImageDataUrl } from "./images";
 import { requireActiveOrg } from "./members";
 import { authorize } from "./rbac/authorize";
 
@@ -84,6 +85,8 @@ const productBody = z.object({
   lowStockThreshold: z.number().int().min(0).max(1_000_000).nullable().optional(),
   /** ADR-0020: tax-exempt product (pharmacy/agro). */
   taxFree: z.boolean().optional(),
+  /** ADR-0022: product photo (data-URL or asset URL). */
+  imageUrl: z.string().min(1).max(2_000_000).nullable().optional(),
   prices: priceMap,
 });
 
@@ -100,6 +103,8 @@ const productUpdateBody = z
     isActive: z.boolean().optional(),
     /** ADR-0020: tax-exempt product (pharmacy/agro). */
     taxFree: z.boolean().optional(),
+    /** ADR-0022: product photo (data-URL or asset URL). */
+    imageUrl: z.string().min(1).max(2_000_000).nullable().optional(),
     /**
      * ADR-0018 D5: `number` = set that currency's price, `null` = remove it,
      * omitted = unchanged. The product may never end up with zero prices —
@@ -258,6 +263,7 @@ export async function listProducts(headers: Headers, query: URLSearchParams) {
         isActive: products.isActive,
         lowStockThreshold: products.lowStockThreshold,
         taxFree: products.taxFree,
+        imageUrl: products.imageUrl,
         categoryId: products.categoryId,
         categoryName: sql<string>`${categories.name}`,
       })
@@ -302,6 +308,8 @@ export async function listProducts(headers: Headers, query: URLSearchParams) {
 
 export async function createProduct(headers: Headers, raw: unknown) {
   const body = productBody.parse(raw);
+  // ADR-0022: validate the product photo (fail-closed) before the write.
+  const imageUrl = validateImageDataUrl(body.imageUrl);
   const { userId, orgId } = await requireActiveOrg(headers);
   const id = uuidv7();
   return withTenantDb(orgId, async (db) => {
@@ -332,6 +340,7 @@ export async function createProduct(headers: Headers, raw: unknown) {
         costCdfMinor: body.costCdfMinor ?? null,
         lowStockThreshold: body.lowStockThreshold ?? null,
         taxFree: body.taxFree ?? false,
+        imageUrl,
       });
     } catch (e) {
       if (String(e).includes("products_org_sku_uq")) {
@@ -359,6 +368,8 @@ export async function updateProduct(
   raw: unknown,
 ) {
   const body = productUpdateBody.parse(raw);
+  // ADR-0022: validate the product photo (fail-closed) before the write.
+  const imageUrl = validateImageDataUrl(body.imageUrl);
   const { userId, orgId } = await requireActiveOrg(headers);
   return withTenantDb(orgId, async (db) => {
     await authorize(db, { userId, permission: "products.update" });
@@ -383,6 +394,7 @@ export async function updateProduct(
     if (body.lowStockThreshold !== undefined) patch.lowStockThreshold = body.lowStockThreshold;
     if (body.isActive !== undefined) patch.isActive = body.isActive;
     if (body.taxFree !== undefined) patch.taxFree = body.taxFree;
+    if (body.imageUrl !== undefined) patch.imageUrl = imageUrl;
     try {
       await db.update(products).set(patch).where(eq(products.id, productId));
     } catch (e) {

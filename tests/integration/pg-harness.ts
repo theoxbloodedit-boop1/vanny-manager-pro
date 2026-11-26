@@ -30,7 +30,8 @@ export type SuiteName =
   | "context"
   | "phone"
   | "scratch"
-  | "reconnect";
+  | "reconnect"
+  | "vault";
 
 const PORTS: Record<string, number> = {
   isolation: 55433,
@@ -40,6 +41,7 @@ const PORTS: Record<string, number> = {
   phone: 55437,
   scratch: 55438,
   reconnect: 55439,
+  vault: 55440,
 };
 const DATA_DIRS: Record<string, string> = {
   isolation: "/tmp/vanny-pg-integration",
@@ -49,6 +51,7 @@ const DATA_DIRS: Record<string, string> = {
   phone: "/tmp/vanny-pg-phone",
   scratch: "/tmp/vanny-pg-scratch",
   reconnect: "/tmp/vanny-pg-reconnect",
+  vault: "/tmp/vanny-pg-vault",
 };
 
 export interface HarnessUrls {

@@ -245,7 +245,7 @@ export default function HomePage() {
               <ShieldCheck className="size-3.5 text-primary" aria-hidden />
               Le SaaS de gestion pour vos commerces — conçu pour la RDC
             </span>
-            <h1 className="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl">
+            <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl">
               Gérez votre commerce,
               <br />
               <span className="text-primary">tout en un seul espace.</span>
@@ -281,7 +281,7 @@ export default function HomePage() {
         {/* Pourquoi nous choisir */}
         <section className="pb-14 md:pb-20">
           <div className="mb-8 max-w-xl">
-            <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
               Pourquoi nous choisir
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -309,7 +309,7 @@ export default function HomePage() {
         {/* Optimisé par activité */}
         <section className="border-y border-border bg-surface py-14 md:py-16">
           <div className="mb-8 max-w-xl">
-            <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
               Une plateforme optimisée selon votre activité
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -338,7 +338,7 @@ export default function HomePage() {
         {/* Comment ça marche */}
         <section className="py-14 md:py-16">
           <div className="mb-8 max-w-xl">
-            <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
               Opérationnel en trois étapes
             </h2>
           </div>
@@ -408,7 +408,7 @@ export default function HomePage() {
         {/* CTA final */}
         <section className="pb-16 md:pb-20">
           <div className="overflow-hidden rounded-card border border-border bg-gradient-to-br from-primary-faint via-background to-primary-soft/70 p-8 text-center shadow-card sm:p-12">
-            <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
               Prêt à gérer votre activité proprement ?
             </h2>
             <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
