@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
 import { uuidv7 } from "../lib/uuid";
-import { resolveBaseURL } from "./base-url";
+import { resolveBaseURL, resolveTrustedOrigins } from "./base-url";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../server/email";
 import { orgAccessControl, orgRoles } from "../server/rbac/org-roles";
 import {
@@ -41,6 +41,13 @@ export function createAuth() {
   }
   return betterAuth({
     baseURL: resolveBaseURL(),
+    // ADR-0012 follow-up (prod "Invalid origin", 2026-11-26): VERCEL_URL is
+    // the deployment's subdomain, but the production domain
+    // (APP_PRODUCTION_URL, e.g. https://vanny-manager-pro.vercel.app) is a
+    // different ORIGIN. Better Auth trusts the baseURL origin by default and
+    // these as ADDITIONAL trusted origins — sign-in works from the
+    // production domain, every deployment URL, and self-hosted alike.
+    trustedOrigins: resolveTrustedOrigins(),
     secret,
     database: drizzleAdapter(getAuthDb(), {
       provider: "pg",

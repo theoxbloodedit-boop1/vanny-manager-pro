@@ -91,3 +91,26 @@ lag the release):
   without re-login, last-owner guard, canceled-invitation rejection,
   cross-tenant isolation (RBAC + RLS + invitation ledger).
 - End-to-end HTTP walk on `next dev` + real PG (see Phase 1b changelog).
+
+## Follow-up (2026-11-26): origin check on Vercel — deployment URL + production alias
+
+Two production incidents of the same family, both "Invalid origin" at
+browser sign-in:
+
+1. **Static `BETTER_AUTH_URL` goes stale on redeploy** (fixed in
+   `3c5fdc4`, PR #10): every Vercel deployment has its own `VERCEL_URL`, so
+   `baseURL` is now resolved from `VERCEL_URL` at runtime
+   (`src/auth/base-url.ts`, `resolveBaseURL`).
+2. **The production alias domain is a different origin** (this follow-up):
+   even with `baseURL` correct, sign-in from the stable production domain
+   (e.g. `https://vanny-manager-pro.vercel.app`) was rejected because it is
+   not the deployment's own subdomain. Fix: `resolveTrustedOrigins()` passes
+   the deployment URL (`VERCEL_URL`), `BETTER_AUTH_URL`, and
+   `APP_PRODUCTION_URL` (new env, set in Vercel production environment
+   variables) to Better Auth's `trustedOrigins` option — additive with the
+   default (baseURL's origin). No security weakening: every entry is an
+   explicit, operator-managed value; no wildcard.
+
+   Env: `APP_PRODUCTION_URL=https://vanny-manager-pro.vercel.app` (Vercel,
+   production). Tests: `tests/unit/base-url.test.ts`
+   (`resolveTrustedOrigins` block).
