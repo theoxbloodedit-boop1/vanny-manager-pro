@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
 import { uuidv7 } from "../lib/uuid";
+import { resolveBaseURL } from "./base-url";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../server/email";
 import { orgAccessControl, orgRoles } from "../server/rbac/org-roles";
 import {
@@ -39,7 +40,7 @@ export function createAuth() {
     );
   }
   return betterAuth({
-    baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+    baseURL: resolveBaseURL(),
     secret,
     database: drizzleAdapter(getAuthDb(), {
       provider: "pg",
