@@ -36,6 +36,13 @@
       "when": 1795687226824,
       "tag": "0005_phone_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795697607665,
+      "tag": "0006_tenant_theming",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import {
   LogOut,
   MailPlus,
   MessageCircle,
+  Palette,
   Store,
   Users,
 } from "lucide-react";
@@ -30,9 +31,19 @@ import {
   Input,
   Logo,
   Select,
+  Segmented,
   Spinner,
   Stat,
 } from "@/components/ui";
+import {
+  applyTheme,
+  clearTheme,
+  getStoredMode,
+  storeMode,
+  THEMES,
+  THEME_IDS,
+  type ThemeMode,
+} from "@/themes/themes";
 
 /**
  * Coquille d'administration (Module A) : membres, invitations, succursales
@@ -60,6 +71,8 @@ interface Me {
     slug: string;
     businessSector: string;
     baseCurrency: string;
+    /** ADR-0015: tenant tone (static catalog id) or null = neutral. */
+    themeId: string | null;
   } | null;
   role?: string | null;
 }
@@ -148,12 +161,23 @@ export default function AdminPage() {
   const [busy, setBusy] = useState<string>();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ADR-0015 — tenant theming. The tone is a TENANT setting (org row); the
+  // light/dark mode is a PER-DEVICE preference (localStorage). Applying =
+  // overriding the semantic CSS variables on <html> (neutral shows through
+  // when no tone, or for an unknown id — fail-closed in themes.ts).
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredMode);
   useEffect(() => {
     const d = me.data;
     if (!me.isLoading && d && !d.authenticated) router.replace("/auth");
     if (!me.isLoading && d?.authenticated && !d.organization)
       router.replace("/post-auth");
   }, [me.data, me.isLoading, router]);
+
+  const activeThemeId = me.data?.organization?.themeId ?? null;
+  useEffect(() => {
+    if (me.data?.organization) applyTheme(activeThemeId, themeMode);
+    else clearTheme();
+  }, [me.data?.organization, activeThemeId, themeMode]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ["members"] });
@@ -191,7 +215,27 @@ export default function AdminPage() {
   const myRole = me.data.role ?? "member";
   const canManage = myRole === "owner" || myRole === "admin" || myRole === "manager";
   const canSeeInvites = myRole === "owner" || myRole === "admin";
+  // ADR-0015: org.settings.manage is owner-only in the permission matrix.
+  const canTheme = myRole === "owner";
   const pendingCount = (orgInvites.data ?? []).filter((i) => i.status === "pending").length;
+
+  async function setTheme(themeId: string | null) {
+    await run(
+      "theme",
+      () =>
+        post("/api/org/theme", { themeId }),
+      () => {
+        qc.invalidateQueries({ queryKey: ["me"] });
+        // Snappy feedback before the /api/me refetch lands.
+        applyTheme(themeId, themeMode);
+      },
+    );
+  }
+
+  function setDarkMode(mode: ThemeMode) {
+    setThemeMode(mode);
+    storeMode(mode);
+  }
 
   return (
     <div className="min-h-screen bg-surface">
@@ -671,6 +715,98 @@ export default function AdminPage() {
                   )}
                 </ul>
               )}
+            </Card>
+          )}
+
+          {/* ADR-0015 — Apparence (tone) : owner only. */}
+          {canTheme && (
+            <Card
+              title="Apparence"
+              subtitle="Choisissez le ton de votre espace. Appliqué à toute votre équipe ; le mode clair/sombre est propre à chacun de vos appareils."
+              icon={Palette}
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold">Mode</span>
+                  <Segmented
+                    className="grid-cols-2"
+                    value={themeMode}
+                    onChange={(m) => setDarkMode(m as ThemeMode)}
+                    options={[
+                      { value: "light", label: "Clair" },
+                      { value: "dark", label: "Sombre" },
+                    ]}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => setTheme(null)}
+                    disabled={busy === "theme"}
+                    className={`rounded-control border p-3 text-left transition-colors ${
+                      activeThemeId === null
+                        ? "border-primary ring-2 ring-primary-soft"
+                        : "border-border hover:bg-surface-inset"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className="size-4 rounded-full border border-border"
+                        style={{ background: "#ffffff" }}
+                        aria-hidden
+                      />
+                      <span
+                        className="size-4 rounded-full border border-border"
+                        style={{ background: "#0b5cff" }}
+                        aria-hidden
+                      />
+                      <span
+                        className="size-4 rounded-full border border-border"
+                        style={{ background: "#0b1220" }}
+                        aria-hidden
+                      />
+                    </span>
+                    <span className="mt-2 block text-sm font-semibold">Neutre</span>
+                  </button>
+                  {THEME_IDS.map((id) => {
+                    const t = THEMES[id];
+                    const active = activeThemeId === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setTheme(id)}
+                        disabled={busy === "theme"}
+                        className={`rounded-control border p-3 text-left transition-colors ${
+                          active
+                            ? "border-primary ring-2 ring-primary-soft"
+                            : "border-border hover:bg-surface-inset"
+                        }`}
+                      >
+                        <span
+                          className="flex h-9 items-center justify-center gap-1.5 rounded-control"
+                          style={{ background: t.swatch.bg }}
+                        >
+                          <span
+                            className="size-4 rounded-full"
+                            style={{ background: t.swatch.accent }}
+                            aria-hidden
+                          />
+                          <span
+                            className="size-4 rounded-full"
+                            style={{ background: t.swatch.text }}
+                            aria-hidden
+                          />
+                        </span>
+                        <span className="mt-2 block text-sm font-semibold">
+                          {t.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <ApiErrorText error={errors.theme} />
+              </div>
             </Card>
           )}
         </div>
