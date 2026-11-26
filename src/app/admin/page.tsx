@@ -8,10 +8,17 @@ import {
   KeyRound,
   LogOut,
   MailPlus,
+  MessageCircle,
   Store,
   Users,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
+import {
+  buildInviteAppUrl,
+  buildInviteMessage,
+  buildWhatsAppUrl,
+  normalizeWaPhone,
+} from "@/server/invite-link";
 import {
   ApiErrorText,
   Avatar,
@@ -124,6 +131,16 @@ export default function AdminPage() {
   const [invEmail, setInvEmail] = useState("");
   const [invRole, setInvRole] = useState("cashier");
   const [invBranches, setInvBranches] = useState<string[]>([]);
+  // ADR-0017 — WhatsApp share: optional invitee number at invite time, the
+  // last-created invitation (for the success panel), and the pending row
+  // currently expanded for sharing.
+  const [invPhone, setInvPhone] = useState("");
+  const [lastInvite, setLastInvite] = useState<{
+    email: string;
+    phone: string | null;
+  } | null>(null);
+  const [waRow, setWaRow] = useState<string | null>(null);
+  const orgName = me.data?.organization?.name ?? "VANNY";
   const [branchName, setBranchName] = useState("");
   const [branchAddress, setBranchAddress] = useState("");
   const [grantMember, setGrantMember] = useState("");
@@ -334,6 +351,18 @@ export default function AdminPage() {
                     placeholder="collegue@exemple.cd"
                   />
                 </Field>
+                <Field
+                  label="Numéro WhatsApp de l’invité (optionnel)"
+                  hint="Pour partager le lien d’invitation directement sur WhatsApp."
+                >
+                  <Input
+                    type="tel"
+                    value={invPhone}
+                    onChange={(e) => setInvPhone(e.target.value)}
+                    placeholder="+243 978 508 099"
+                    autoComplete="off"
+                  />
+                </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Rôle">
                     <Select
@@ -379,25 +408,48 @@ export default function AdminPage() {
                 <ApiErrorText error={errors.invite} />
                 <Button
                   loading={busy === "invite"}
-                  onClick={() =>
+                  onClick={() => {
+                    const email = invEmail;
+                    const phone = normalizeWaPhone(invPhone);
                     run(
                       "invite",
                       () =>
                         post("/api/invitations", {
-                          email: invEmail,
+                          email,
                           role: invRole,
                           branchIds: invBranches,
                         }),
                       () => {
+                        setLastInvite({ email, phone });
                         setInvEmail("");
+                        setInvPhone("");
                         setInvBranches([]);
                       },
-                    )
-                  }
+                    );
+                  }}
                   className="w-full"
                 >
                   Envoyer l’invitation
                 </Button>
+
+                {/* ADR-0017 — share the created invitation over WhatsApp. */}
+                {lastInvite && (
+                  <div className="space-y-2 rounded-control border border-success/40 bg-surface-inset p-3">
+                    <p className="text-sm leading-5 text-muted-foreground">
+                      Invitation créée pour{" "}
+                      <span className="font-semibold text-foreground">
+                        {lastInvite.email}
+                      </span>
+                      . Partagez le lien d’invitation :
+                    </p>
+                    <ShareInviteControls
+                      email={lastInvite.email}
+                      orgName={orgName}
+                      initialPhone={lastInvite.phone ?? ""}
+                      onDone={() => setLastInvite(null)}
+                    />
+                  </div>
+                )}
               </div>
             </Card>
           )}
@@ -561,29 +613,54 @@ export default function AdminPage() {
                   {orgInvites.data
                     ?.filter((i) => i.status === "pending")
                     .map((i) => (
-                      <li
-                        key={i.id}
-                        className="flex items-center justify-between gap-3 py-2.5"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold">{i.email}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {ROLE_LABELS[i.role.split(",")[0] ?? ""] ?? i.role}
-                          </p>
+                      <li key={i.id} className="py-2.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">
+                              {i.email}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {ROLE_LABELS[i.role.split(",")[0] ?? ""] ?? i.role}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              variant="outline"
+                              className="min-h-9"
+                              title="Partager le lien d’invitation sur WhatsApp"
+                              aria-label={`Partager l’invitation de ${i.email} sur WhatsApp`}
+                              onClick={() =>
+                                setWaRow(waRow === i.id ? null : i.id)
+                              }
+                            >
+                              <MessageCircle className="size-4 text-success" aria-hidden />
+                              <span className="hidden sm:inline">WhatsApp</span>
+                            </Button>
+                            <Button
+                              variant="danger"
+                              className="min-h-9"
+                              loading={busy === `cancel-${i.id}`}
+                              onClick={() =>
+                                run(`cancel-${i.id}`, () =>
+                                  post("/api/invitations/cancel", {
+                                    invitationId: i.id,
+                                  }),
+                                )
+                              }
+                            >
+                              Annuler
+                            </Button>
+                          </div>
                         </div>
-                        <Button
-                          variant="danger"
-                          loading={busy === `cancel-${i.id}`}
-                          onClick={() =>
-                            run(`cancel-${i.id}`, () =>
-                              post("/api/invitations/cancel", {
-                                invitationId: i.id,
-                              }),
-                            )
-                          }
-                        >
-                          Annuler
-                        </Button>
+                        {waRow === i.id && (
+                          <div className="mt-2 rounded-control bg-surface-inset p-3">
+                            <ShareInviteControls
+                              email={i.email}
+                              orgName={orgName}
+                              onDone={() => setWaRow(null)}
+                            />
+                          </div>
+                        )}
                       </li>
                     ))}
                   {(orgInvites.data?.filter((i) => i.status === "pending") ?? [])
@@ -598,6 +675,65 @@ export default function AdminPage() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+/**
+ * ADR-0017 — Share an invitation over WhatsApp (option A, free, no backend).
+ *
+ * Builds the app link (`/auth?email=…`) for THIS deployment's origin, composes
+ * a French message, and opens `wa.me/<e164>?text=…` in a new tab so the owner
+ * presses send. The invitee number is optional: if a valid one is pre-filled
+ * the button is ready immediately, otherwise the owner types it.
+ */
+function ShareInviteControls({
+  email,
+  orgName,
+  initialPhone = "",
+  onDone,
+}: {
+  email: string;
+  orgName: string;
+  initialPhone?: string;
+  onDone: () => void;
+}) {
+  const [phone, setPhone] = useState(initialPhone);
+  const e164 = normalizeWaPhone(phone);
+
+  function openWhatsApp() {
+    if (!e164) return;
+    const appUrl = buildInviteAppUrl(window.location.origin, email);
+    const url = buildWhatsAppUrl(e164, buildInviteMessage(orgName, email, appUrl));
+    window.open(url, "_blank", "noopener,noreferrer");
+    onDone();
+  }
+
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+      <div className="min-w-0 flex-1">
+        <Field
+          label="Numéro WhatsApp de l’invité"
+          hint="Le lien s’ouvre pré-rempli dans votre WhatsApp — appuyez sur envoyer."
+        >
+          <Input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+243 978 508 099"
+            autoComplete="off"
+          />
+        </Field>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Button onClick={openWhatsApp} disabled={!e164}>
+          <MessageCircle className="size-4" aria-hidden />
+          Ouvrir WhatsApp
+        </Button>
+        <Button variant="outline" onClick={onDone}>
+          Fermer
+        </Button>
+      </div>
     </div>
   );
 }
