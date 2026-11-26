@@ -13,6 +13,10 @@ concurrency:
 env:
   NEXT_TELEMETRY_DISABLED: 1
 
+# Explicit, minimal token scope (read-only). No job needs write access.
+permissions:
+  contents: read
+
 jobs:
   # ---------------------------------------------------------------- static
   typecheck:
@@ -67,10 +71,25 @@ jobs:
           fi
           echo "OK — no secret-bearing NEXT_PUBLIC_ variable"
 
+      - name: install gitleaks (pinned)
+        run: |
+          set -euo pipefail
+          VER=8.24.3
+          curl -s -fL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" -o /tmp/gitleaks.tgz
+          mkdir -p "$HOME/.local/bin"
+          tar xzf /tmp/gitleaks.tgz -C "$HOME/.local/bin" gitleaks
+          "$HOME/.local/bin/gitleaks" version
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: scan history for leaked credentials
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Direct scan of the full git history (checkout uses fetch-depth: 0).
+          # The gitleaks *action* is intentionally not used: on this repo it
+          # fails with HTTP 403 "Resource not accessible by integration"
+          # (GitHub API permission issue in the action, unrelated to leaks —
+          # it never even reached the detector). Same engine, same default
+          # rules, pinned version, zero API dependency.
+          gitleaks detect --source . --log-opts="--all" --redact --no-banner -v
 
   # ---------------------------------------------------------------- tests
   test-unit:
@@ -104,7 +123,15 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:integration
+
+      - name: run integration suite (real PostgreSQL)
+        run: pnpm test:integration -- --no-file-parallelism --testTimeout=60000 --hookTimeout=60000
+        # CI runners (2 vCPU) run 4 embedded PostgreSQL instances in parallel;
+        # under load, initdb + migrations (107 statements) exceeded vitest's
+        # default 5s hook timeout, so the worker was killed mid-test and the
+        # in-flight queries saw a server shutdown (FATAL 57P01). Serial files
+        # + 60s timeouts make the suite deterministic without touching a line
+        # of test logic.
 
   # Phase 5 adds: test-e2e (Playwright) and the real-device offline gate.
 
