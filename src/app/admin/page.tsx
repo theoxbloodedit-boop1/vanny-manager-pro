@@ -44,6 +44,8 @@ import {
   THEME_IDS,
   type ThemeMode,
 } from "@/themes/themes";
+import { CatalogPanel } from "@/components/catalog-panel";
+import { StockPanel } from "@/components/stock-panel";
 
 /**
  * Coquille d'administration (Module A) : membres, invitations, succursales
@@ -809,6 +811,22 @@ export default function AdminPage() {
               </div>
             </Card>
           )}
+
+          {/* ADR-0018 — Phase 2 : catalogue & stock. Editable by whoever the
+              role matrix grants product/inventory rights to; the server is
+              the final authority (RLS + authorize()). */}
+          {/* Catalog: products.create/update/delete = owner + admin only
+              (permission matrix, ADR-0001). Stock: inventory.adjust/transfer
+              = owner, admin, manager, stock_manager. */}
+          <CatalogPanel canEdit={myRole === "owner" || myRole === "admin"} />
+          <StockPanel
+            canEdit={
+              myRole === "owner" ||
+              myRole === "admin" ||
+              myRole === "manager" ||
+              myRole === "stock_manager"
+            }
+          />
         </div>
       </main>
     </div>

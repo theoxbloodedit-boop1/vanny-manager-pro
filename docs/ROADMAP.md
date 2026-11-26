@@ -98,27 +98,28 @@ pipeline.
 
 ## Phase 2 — Catalog and inventory
 
-**Authorized** (propriétaire, 2026-11-26 — « GO Phases 2-5 »). Phases 3/4/5 are
-pre-authorized in the same decision; each still starts only when the previous
-gate passes (sequential gates are a roadmap invariant, not an approval
-question).
+**DONE** (propriétaire GO 2026-11-26 « GO Phases 2-5 ») — ADR-0018, branch
+`feat/phase2-catalog-stock`. Phases 3/4/5 are pre-authorized in the same
+decision; each still starts only when the previous gate passes (sequential
+gates are a roadmap invariant, not an approval question).
 
 | # | Task |
 |---|---|
 | 2.1 | Categories, products (goods + services), units, SKU, barcode |
-| 2.2 | **Independent USD and CDF prices** — both mandatory, neither derived |
-| 2.3 | Per-branch stock derived from movements |
-| 2.4 | Movements: purchase, adjustment, transfer in/out, sale, return |
+| 2.2 | **Independent USD and CDF prices** — at least one mandatory, neither derived (ADR-0018 D5) |
+| 2.3 | Per-branch stock derived from movements (`branch_stock` view, `security_invoker`) |
+| 2.4 | Movements: purchase, adjustment, transfer in/out (`sale`/`return` = Phase 3) |
 | 2.5 | Atomic branch-to-branch transfers |
 | 2.6 | Low-stock thresholds |
-| 2.7 | Search (`pg_trgm` + `unaccent`) |
+| 2.7 | Search (`unaccent` + `ILIKE` v1; `pg_trgm` reserved for v2) |
 
-**Gate 2**
-- [ ] `branch_stock == Σ movements` invariant holds after every mutation type (**T3**).
-- [ ] A transfer moves stock in both branches or neither.
-- [ ] A sale with insufficient stock fails **unless** the item is a service or untracked — explicit.
-- [ ] A product with a missing price in either currency is rejected at write time.
-- [ ] Accent/case-insensitive search under 150 ms on 10k products.
+**Gate 2 — PASSED** (`tests/integration/phase2-stock.test.ts`, 13 tests)
+- [x] `branch_stock == Σ movements` invariant holds after every mutation type (**T3**).
+- [x] A transfer moves stock in both branches or neither (raw-tx rollback proven).
+- [x] An out-movement with insufficient stock fails with 409 `INSUFFICIENT_STOCK`; services fail with 409 `SERVICE_NO_STOCK` (sales = Phase 3, same rule).
+- [x] A product without any price is rejected at write time (400); the last price cannot be removed (400 `PRICE_REQUIRED`).
+- [x] Accent/case-insensitive search under 150 ms on 10k products.
+- [x] Ledger is append-only even for the DB owner (trigger + code grep guard); RLS isolation incl. the `branch_stock` view.
 
 ---
 

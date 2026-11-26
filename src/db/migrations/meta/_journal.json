@@ -43,6 +43,13 @@
       "when": 1795697607665,
       "tag": "0006_tenant_theming",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795701934595,
+      "tag": "0007_catalog_stock",
+      "breakpoints": true
     }
   ]
 }
