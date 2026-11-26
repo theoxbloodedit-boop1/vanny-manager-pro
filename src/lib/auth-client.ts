@@ -58,6 +58,43 @@ export async function signInEmail(input: {
   return { ok: true };
 }
 
+/**
+ * ADR-0016: sign in with a WhatsApp number. The session cookie is set by the
+ * response, exactly like the email sign-in.
+ */
+export async function signInPhone(input: {
+  phone: string;
+  password: string;
+}): Promise<AuthResult> {
+  const { status, json } = await call("/sign-in/phone", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  if (status >= 400) {
+    return { ok: false, error: String(json.message ?? "Connexion impossible") };
+  }
+  return { ok: true };
+}
+
+/**
+ * ADR-0016: create an account with a WhatsApp number (no email required).
+ * The account is validated by the team before it can be used.
+ */
+export async function signUpPhone(input: {
+  name: string;
+  phone: string;
+  password: string;
+}): Promise<AuthResult> {
+  const { status, json } = await call("/sign-up/phone", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  if (status >= 400) {
+    return { ok: false, error: String(json.message ?? "Inscription impossible") };
+  }
+  return { ok: true };
+}
+
 export async function signOut(): Promise<void> {
   await call("/sign-out", { method: "POST", body: "{}" });
 }

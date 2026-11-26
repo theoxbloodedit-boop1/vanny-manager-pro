@@ -4,7 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BadgeCheck, Building2, CheckCircle2, Mail } from "lucide-react";
+import {
+  BadgeCheck,
+  Building2,
+  CheckCircle2,
+  Mail,
+  MessageCircle,
+} from "lucide-react";
 import { Badge, Button, Card, Logo, Spinner } from "@/components/ui";
 
 /**
@@ -27,6 +33,10 @@ interface Me {
     name: string;
     email: string;
     emailVerified: boolean;
+    /** ADR-0016: WhatsApp number for phone accounts. */
+    phone?: string | null;
+    /** ADR-0014/0016: operator-approved. */
+    manuallyApproved?: boolean;
   };
   organization?: { name: string } | null;
   role?: string | null;
@@ -138,7 +148,8 @@ export default function PostAuthPage() {
 
   if (me.organization) return null; // redirecting to /admin
 
-  const verified = me.user?.emailVerified;
+  const isPhoneUser = !!me.user?.phone;
+  const verified = !!me.user?.emailVerified || !!me.user?.manuallyApproved;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-5 p-6">
@@ -150,10 +161,29 @@ export default function PostAuthPage() {
         <h1 className="text-xl font-extrabold tracking-tight">
           Bonjour {me.user?.name?.split(" ")[0]}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{me.user?.email}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isPhoneUser ? me.user?.phone : me.user?.email}
+        </p>
       </header>
 
       {!verified ? (
+        isPhoneUser ? (
+          <Card
+            title="Votre compte est en attente"
+            subtitle="Notre équipe confirme votre inscription sur WhatsApp, puis vous pourrez créer votre entreprise. Ceci prend quelques minutes."
+            icon={MessageCircle}
+          >
+            <div className="space-y-3">
+              <Button onClick={recheckVerification} loading={checking} className="w-full">
+                <CheckCircle2 className="size-4" aria-hidden />
+                J’ai été validé(e)
+              </Button>
+              {notice ? (
+                <p className="text-sm text-muted-foreground">{notice}</p>
+              ) : null}
+            </div>
+          </Card>
+        ) : (
         <Card
           title="Vérifiez votre adresse email"
           subtitle="Nous vous avons envoyé un lien de confirmation. Il protège vos invitations et expire dans 24 heures."
@@ -183,6 +213,7 @@ export default function PostAuthPage() {
             ) : null}
           </div>
         </Card>
+        )
       ) : invitations.isLoading ? (
         <Card title="Vos invitations" icon={Mail}>
           <div className="flex justify-center py-4">

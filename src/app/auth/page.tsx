@@ -2,36 +2,57 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ShieldCheck } from "lucide-react";
-import { signInEmail, signUpEmail } from "@/lib/auth-client";
+import { MessageCircle, ShieldCheck } from "lucide-react";
+import {
+  signInEmail,
+  signInPhone,
+  signUpEmail,
+  signUpPhone,
+} from "@/lib/auth-client";
 import { ApiErrorText, Button, Field, Input, Logo, Segmented } from "@/components/ui";
 
 /**
- * Connexion / Inscription (Module A).
+ * Connexion / Inscription (Module A + ADR-0016).
+ *
+ * Two identifiers: email or WhatsApp number.
+ *   - Sign-in : one field (« Email ou WhatsApp ») — no @ → phone path.
+ *   - Sign-up : Email / WhatsApp choice. A WhatsApp account (no mailbox) is
+ *     validated by the team, then the customer creates their organization.
  *
  * After a successful call we go to /post-auth, which orchestrates:
- * email verification → invitation acceptance → onboarding → admin.
+ * verification / approval → invitation acceptance → onboarding → admin.
  */
 export default function AuthPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [signupVia, setSignupVia] = useState<"email" | "phone">("email");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+
+  const phoneMode = mode === "signup" && signupVia === "phone";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(undefined);
     try {
+      let ok: { ok: boolean; error?: string };
       if (mode === "signup") {
-        const r = await signUpEmail({ name, email, password });
-        if (!r.ok) throw new Error(r.error || "Inscription impossible");
+        ok = phoneMode
+          ? await signUpPhone({ name, phone, password })
+          : await signUpEmail({ name, email: identifier, password });
+        if (!ok.ok) throw new Error(ok.error || "Inscription impossible");
       } else {
-        const r = await signInEmail({ email, password });
-        if (!r.ok) throw new Error(r.error || "Connexion impossible");
+        // One field, two paths: an address with @ is an email, otherwise a
+        // WhatsApp number (the server normalizes it).
+        ok = identifier.includes("@")
+          ? await signInEmail({ email: identifier, password })
+          : await signInPhone({ phone: identifier, password });
+        if (!ok.ok) throw new Error(ok.error || "Connexion impossible");
       }
       router.replace("/post-auth");
     } catch (err) {
@@ -68,6 +89,20 @@ export default function AuthPage() {
               ? "Accédez à votre organisation."
               : "Deux minutes, puis vous invitez votre équipe."}
           </p>
+          {mode === "signup" && (
+            <Segmented
+              className="mt-4 grid-cols-2"
+              value={signupVia}
+              onChange={(v) => {
+                setSignupVia(v);
+                setError(undefined);
+              }}
+              options={[
+                { value: "email", label: "Avec email" },
+                { value: "phone", label: "Avec WhatsApp" },
+              ]}
+            />
+          )}
         </div>
 
         <form onSubmit={submit} className="space-y-4">
@@ -82,16 +117,43 @@ export default function AuthPage() {
               />
             </Field>
           )}
-          <Field label="Adresse email">
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="vous@exemple.cd"
-              autoComplete="email"
-              required
-            />
-          </Field>
+
+          {phoneMode ? (
+            <Field
+              label="Numéro WhatsApp"
+              hint="Ex. 0971234567 — notre équipe vous confirme sur WhatsApp."
+            >
+              <Input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="0971234567"
+                autoComplete="tel"
+                required
+              />
+            </Field>
+          ) : (
+            <Field
+              label={mode === "signin" ? "Email ou WhatsApp" : "Adresse email"}
+              hint={
+                mode === "signin"
+                  ? "Votre email, ou votre numéro WhatsApp (ex. 0971234567)."
+                  : undefined
+              }
+            >
+              <Input
+                type={mode === "signin" ? "text" : "email"}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder={
+                  mode === "signin" ? "vous@exemple.cd ou 0971234567" : "vous@exemple.cd"
+                }
+                autoComplete={mode === "signin" ? "username" : "email"}
+                required
+              />
+            </Field>
+          )}
+
           <Field
             label="Mot de passe"
             hint={
@@ -106,7 +168,7 @@ export default function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              minLength={8}
+              minLength={mode === "signup" ? 8 : undefined}
               required
             />
           </Field>
@@ -116,6 +178,14 @@ export default function AuthPage() {
           <Button type="submit" loading={busy} className="w-full">
             {mode === "signin" ? "Se connecter" : "Créer mon compte"}
           </Button>
+
+          {phoneMode && (
+            <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+              <MessageCircle className="mt-0.5 size-3.5 shrink-0 text-success" aria-hidden />
+              Pas besoin d’email : après votre inscription, notre équipe vous
+              appelle sur WhatsApp pour valider votre compte (gratuit).
+            </p>
+          )}
         </form>
       </div>
 

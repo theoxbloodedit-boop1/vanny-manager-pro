@@ -29,6 +29,13 @@
       "when": 1795619581209,
       "tag": "0003_striped_klaw",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795687226824,
+      "tag": "0005_phone_identity",
+      "breakpoints": true
     }
   ]
 }

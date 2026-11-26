@@ -5,6 +5,7 @@ import { withTenantDb } from "../db/tenant";
 import { branches, branchAccess, organizations } from "../db/schema/org";
 import { uuidv7 } from "../lib/uuid";
 import { ApiError } from "./errors";
+import { isManuallyApproved } from "./manual-approval";
 
 /**
  * Onboarding — turns a freshly-signed-up user into a working tenant
@@ -64,6 +65,22 @@ export async function runOnboarding(
   const session = await auth.api.getSession({ headers });
   if (!session?.user) {
     throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
+  }
+
+  // ADR-0016 verification gate (SERVER-side — before this ADR it existed only
+  // in the client, so a direct API call could bypass email verification and
+  // create an org). A user may onboard when their email is VERIFIED or they
+  // are MANUALLY APPROVED (audited operator action; for phone accounts the
+  // approval is the trust anchor). Approval never implies emailVerified.
+  if (!session.user.emailVerified) {
+    const approved = await isManuallyApproved(session.user.id);
+    if (!approved) {
+      throw new ApiError(
+        403,
+        "VERIFICATION_REQUIRED",
+        "Vérifiez votre email (ou faites valider votre compte) avant de créer une organisation.",
+      );
+    }
   }
 
   // A user who already has an organization is re-onboarding — refuse loudly.

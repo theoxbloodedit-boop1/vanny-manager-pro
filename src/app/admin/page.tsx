@@ -60,7 +60,7 @@ interface Member {
   id: string;
   userId: string;
   role: string;
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; phone?: string | null };
 }
 interface Branch {
   id: string;
@@ -282,8 +282,8 @@ export default function AdminPage() {
                             {m.user.name}
                             {m.userId === me.data.user?.id ? " (vous)" : ""}
                           </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {m.user.email}
+                          <p className="truncate text-xs tabular-nums text-muted-foreground">
+                            {m.user.phone ?? m.user.email}
                           </p>
                         </div>
                       </div>

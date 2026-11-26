@@ -38,6 +38,7 @@
  * sign-up or orphan the account, and the recipient can always resend via the
  * built-in `/api/auth/send-verification-email` endpoint.
  */
+import { isVirtualEmail } from "./phone";
 
 export interface OutboundMail {
   to: string;
@@ -241,7 +242,19 @@ async function sendViaResend(mail: OutboundMail): Promise<void> {
 // Transport dispatch — the single choke point
 // ---------------------------------------------------------------------------
 
+/**
+ * ADR-0016: phone accounts carry a deterministic VIRTUAL email
+ * (`<digits>@phone.vanny.app`) that is an identifier only — it is never a
+ * real mailbox. No mail is ever recorded or delivered for it (no network,
+ * no outbox row, one PII-free log line).
+ */
 export async function deliverMail(mail: OutboundMail): Promise<void> {
+  if (isVirtualEmail(mail.to)) {
+    console.log(
+      "[email:phone] mail skipped — recipient is a phone-account virtual email (no mailbox).",
+    );
+    return;
+  }
   const transport = process.env.MAIL_TRANSPORT ?? "none";
   const isProduction = process.env.NODE_ENV === "production";
   // Non-production: always record in the in-memory outbox (dev verification

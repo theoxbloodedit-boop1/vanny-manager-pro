@@ -23,19 +23,29 @@ import { Pool, type PoolClient } from "pg";
  * parallel. `startPostgres("isolation")` and `startPostgres("auth")` never
  * touch the same files.
  */
-export type SuiteName = "isolation" | "auth" | "approvals" | "context";
+export type SuiteName =
+  | "isolation"
+  | "auth"
+  | "approvals"
+  | "context"
+  | "phone"
+  | "scratch";
 
 const PORTS: Record<string, number> = {
   isolation: 55433,
   auth: 55434,
   approvals: 55435,
   context: 55436,
+  phone: 55437,
+  scratch: 55438,
 };
 const DATA_DIRS: Record<string, string> = {
   isolation: "/tmp/vanny-pg-integration",
   auth: "/tmp/vanny-pg-auth",
   approvals: "/tmp/vanny-pg-approvals",
   context: "/tmp/vanny-pg-context",
+  phone: "/tmp/vanny-pg-phone",
+  scratch: "/tmp/vanny-pg-scratch",
 };
 
 export interface HarnessUrls {

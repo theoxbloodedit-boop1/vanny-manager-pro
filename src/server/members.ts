@@ -1,9 +1,10 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import * as z from "zod";
+import { getAuthDb } from "../auth/db";
 import { getAuth } from "../auth";
 import { withTenantDb } from "../db/tenant";
 import { branches, branchAccess } from "../db/schema/org";
-import { members } from "../db/schema/auth";
+import { members, users } from "../db/schema/auth";
 import { uuidv7 } from "../lib/uuid";
 import { ApiError } from "./errors";
 import { isManuallyApproved } from "./manual-approval";
@@ -229,7 +230,33 @@ export async function changeMemberRole(headers: Headers, raw: unknown) {
 export async function listMembers(headers: Headers) {
   const { orgId } = await requireActiveOrg(headers);
   // The plugin enforces membership on the org; business reads are RLS-scoped.
-  return getAuth().api.listMembers({ query: { organizationId: orgId }, headers });
+  const result = (await getAuth().api.listMembers({
+    query: { organizationId: orgId },
+    headers,
+  })) as {
+    members: {
+      id: string;
+      role: string;
+      user: { id: string; name: string; email: string };
+    }[];
+    total: number;
+  };
+
+  // ADR-0016: attach the WhatsApp number to phone accounts so the admin UI
+  // shows the number instead of the virtual email. Platform `user` table.
+  if (result.members.length > 0) {
+    const db = getAuthDb();
+    const rows = await db
+      .select({ id: users.id, phone: users.phone })
+      .from(users)
+      .where(inArray(users.id, result.members.map((m) => m.user.id)));
+    const phoneById = new Map(rows.map((r) => [r.id, r.phone]));
+    for (const m of result.members) {
+      (m.user as { phone?: string | null }).phone =
+        phoneById.get(m.user.id) ?? null;
+    }
+  }
+  return result;
 }
 
 /** Pending invitations addressed to the signed-in user's email. */
