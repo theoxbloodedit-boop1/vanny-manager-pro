@@ -20,7 +20,8 @@ import { ROLES, type Role } from "./rbac/permissions";
  * Better Auth plugin itself on the calls that need it (defense in depth).
  */
 
-async function requireActiveOrg(headers: Headers): Promise<{
+/** Session → { userId, active orgId } (401/404 fail-closed). Shared. */
+export async function requireActiveOrg(headers: Headers): Promise<{
   userId: string;
   orgId: string;
 }> {

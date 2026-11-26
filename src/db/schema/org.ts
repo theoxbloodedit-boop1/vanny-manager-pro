@@ -34,6 +34,13 @@ export const organizations = pgTable(
     fxRoundingStepCdf: integer("fx_rounding_step_cdf").notNull().default(100),
     timezone: text("timezone").notNull().default("Africa/Kinshasa"),
     status: text("status").notNull().default("active"),
+    /**
+     * ADR-0015 — tenant theming: id of a tone from the STATIC catalog
+     * (src/themes/themes.ts). NULL = neutral (current UI). No SQL CHECK on
+     * purpose: the catalog evolves in code, so validation is app-side and
+     * fail-closed (unknown value → neutral render, never a 500).
+     */
+    themeId: text("theme_id"),
     settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

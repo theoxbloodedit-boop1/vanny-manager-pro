@@ -3,6 +3,7 @@ import { getAuthDb } from "../auth/db";
 import { getAuth } from "../auth";
 import { withTenantDb } from "../db/tenant";
 import { members, users } from "../db/schema/auth";
+import { organizations } from "../db/schema/org";
 import { ApiError } from "./errors";
 import { takeCapturedMails } from "./email";
 import { isVirtualEmail } from "./phone";
@@ -34,6 +35,8 @@ export interface Me {
     businessSector: string;
     baseCurrency: string;
     timezone: string | null;
+    /** ADR-0015: tenant tone (static catalog id) or null = neutral. */
+    themeId: string | null;
   } | null;
   role?: string | null;
 }
@@ -83,6 +86,15 @@ export async function getMe(headers: Headers): Promise<Me> {
           timezone?: string | null;
         }
       | null;
+    // ADR-0015: the tone lives on the RLS-scoped org row (the plugin's
+    // response is not typed for it) — one extra tiny read, same scoping.
+    const themeRows = await withTenantDb(orgId, (db) =>
+      db
+        .select({ themeId: organizations.themeId })
+        .from(organizations)
+        .where(eq(organizations.id, orgId))
+        .limit(1),
+    );
     if (org) {
       me.organization = {
         id: org.id,
@@ -91,6 +103,7 @@ export async function getMe(headers: Headers): Promise<Me> {
         businessSector: org.businessSector ?? "",
         baseCurrency: org.baseCurrency ?? "",
         timezone: org.timezone ?? null,
+        themeId: themeRows[0]?.themeId ?? null,
       };
     }
   } catch {
