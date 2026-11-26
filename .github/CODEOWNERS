@@ -1,0 +1,29 @@
+# CODEOWNERS — every change needs the owner's review.
+#
+# Branch protection (configured manually by the repository owner) requires:
+#   - 1 approving review
+#   - review from a CODEOWNER
+#   - stale reviews dismissed on new commits
+#   - the `ci-ok` status check
+#
+# See docs/GITHUB-SECURITY.md §4 for the full rule set.
+
+# Default owner for everything in the repository.
+*                               @theoxbloodedit-boop1
+
+# Architecture and decision records are the contract the code must honour.
+/docs/                          @theoxbloodedit-boop1
+/docs/adr/                      @theoxbloodedit-boop1
+
+# The schema is the product's source of truth. No drive-by changes.
+/src/db/schema/                 @theoxbloodedit-boop1
+/drizzle.config.ts              @theoxbloodedit-boop1
+
+# Security-sensitive: money, prices, tenancy boundaries.
+/src/lib/money.ts               @theoxbloodedit-boop1
+/src/lib/prices.ts              @theoxbloodedit-boop1
+
+# The pipeline is the enforcement layer.
+/.github/workflows/             @theoxbloodedit-boop1
+/.github/CODEOWNERS             @theoxbloodedit-boop1
+/scripts/verify-sw.mjs          @theoxbloodedit-boop1

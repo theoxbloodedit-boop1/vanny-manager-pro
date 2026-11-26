@@ -1,0 +1,176 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: 1
+
+# Explicit, minimal token scope (read-only). No job needs write access.
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------- static
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  secrets-guard:
+    name: secrets-guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: .env.example must contain keys only
+        run: |
+          if grep -nE '^[A-Za-z_][A-Za-z0-9_]*=.+' .env.example; then
+            echo "::error::.env.example must not contain values"
+            exit 1
+          fi
+          echo "OK — .env.example has no values"
+
+      - name: no secret-bearing NEXT_PUBLIC_ variable
+        run: |
+          if grep -rnE 'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|KEY|TOKEN|PASSWORD)' \
+               --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' . \
+               --exclude-dir=node_modules --exclude-dir=.next; then
+            echo "::error::a NEXT_PUBLIC_ variable appears to hold a secret"
+            exit 1
+          fi
+          echo "OK — no secret-bearing NEXT_PUBLIC_ variable"
+
+      - name: install gitleaks (pinned)
+        run: |
+          set -euo pipefail
+          VER=8.24.3
+          curl -s -fL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" -o /tmp/gitleaks.tgz
+          mkdir -p "$HOME/.local/bin"
+          tar xzf /tmp/gitleaks.tgz -C "$HOME/.local/bin" gitleaks
+          "$HOME/.local/bin/gitleaks" version
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: scan history for leaked credentials
+        run: |
+          # Direct scan of the full git history (checkout uses fetch-depth: 0).
+          # The gitleaks *action* is intentionally not used: on this repo it
+          # fails with HTTP 403 "Resource not accessible by integration"
+          # (GitHub API permission issue in the action, unrelated to leaks —
+          # it never even reached the detector). Same engine, same default
+          # rules, pinned version, zero API dependency.
+          gitleaks detect --source . --log-opts="--all" --redact --no-banner -v
+
+  # ---------------------------------------------------------------- tests
+  test-unit:
+    name: test-unit
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:unit
+
+  test-integration:
+    # Real PostgreSQL (embedded-postgres, port 55433, trust auth, localhost
+    # only — no secrets). Proves RLS tenant isolation, the composite price
+    # FK and the one-open-session-per-(register,currency) invariant.
+    # A job that always passes would be worse than no job at all, so this
+    # only exists now that the suite does (ADR-0011).
+    name: test-integration
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: run integration suite (real PostgreSQL)
+        run: pnpm test:integration -- --no-file-parallelism --testTimeout=60000 --hookTimeout=60000
+        # CI runners (2 vCPU) run 4 embedded PostgreSQL instances in parallel;
+        # under load, initdb + migrations (107 statements) exceeded vitest's
+        # default 5s hook timeout, so the worker was killed mid-test and the
+        # in-flight queries saw a server shutdown (FATAL 57P01). Serial files
+        # + 60s timeouts make the suite deterministic without touching a line
+        # of test logic.
+
+  # Phase 5 adds: test-e2e (Playwright) and the real-device offline gate.
+
+  # ---------------------------------------------------------------- build
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # --webpack is MANDATORY. Turbopack exits 0 while emitting no service
+      # worker, which would silently remove all offline capability (ADR-0008).
+      - run: pnpm build
+
+      - name: PWA service-worker guard
+        run: pnpm pwa:guard
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+          retention-days: 3
+
+  # ---------------------------------------------------------------- gate
+  ci-ok:
+    name: ci-ok
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint, secrets-guard, test-unit, test-integration, build]
+    if: always()
+    steps:
+      - name: Fail if any job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: All checks passed
+        run: echo "ci-ok"
