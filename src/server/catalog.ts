@@ -48,7 +48,29 @@ const priceMap = z
 
 const categoryBody = z.object({
   name: z.string().min(1).max(80),
+  sortOrder: z.number().int().min(0).max(100_000).optional(),
+  icon: z.string().min(1).max(40).nullable().optional(),
+  color: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Couleur invalide (#RGB/#RRGGBB)")
+    .nullable()
+    .optional(),
 });
+
+const categoryUpdateBody = z
+  .object({
+    name: z.string().min(1).max(80).optional(),
+    sortOrder: z.number().int().min(0).max(100_000).optional(),
+    icon: z.string().min(1).max(40).nullable().optional(),
+    color: z
+      .string()
+      .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Couleur invalide (#RGB/#RRGGBB)")
+      .nullable()
+      .optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: "Rien à mettre à jour." });
+
+// Category delete takes the id from the URL path (see /api/categories/[id]).
 
 const productBody = z.object({
   name: z.string().min(1).max(120),
@@ -60,6 +82,8 @@ const productBody = z.object({
   costUsdMinor: priceAmount.nullable().optional(),
   costCdfMinor: priceAmount.nullable().optional(),
   lowStockThreshold: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  /** ADR-0020: tax-exempt product (pharmacy/agro). */
+  taxFree: z.boolean().optional(),
   prices: priceMap,
 });
 
@@ -74,6 +98,8 @@ const productUpdateBody = z
     costCdfMinor: priceAmount.nullable().optional(),
     lowStockThreshold: z.number().int().min(0).max(1_000_000).nullable().optional(),
     isActive: z.boolean().optional(),
+    /** ADR-0020: tax-exempt product (pharmacy/agro). */
+    taxFree: z.boolean().optional(),
     /**
      * ADR-0018 D5: `number` = set that currency's price, `null` = remove it,
      * omitted = unchanged. The product may never end up with zero prices —
@@ -98,7 +124,10 @@ export async function listCategories(headers: Headers) {
   const { userId, orgId } = await requireActiveOrg(headers);
   return withTenantDb(orgId, async (db) => {
     await authorize(db, { userId, permission: "products.view" });
-    return db.select().from(categories).orderBy(categories.name);
+    return db
+      .select()
+      .from(categories)
+      .orderBy(categories.sortOrder, categories.name);
   });
 }
 
@@ -109,7 +138,14 @@ export async function createCategory(headers: Headers, raw: unknown) {
   return withTenantDb(orgId, async (db) => {
     await authorize(db, { userId, permission: "categories.manage" });
     try {
-      await db.insert(categories).values({ id, orgId, name: body.name });
+      await db.insert(categories).values({
+        id,
+        orgId,
+        name: body.name,
+        sortOrder: body.sortOrder ?? 0,
+        icon: body.icon ?? null,
+        color: body.color ?? null,
+      });
     } catch (e) {
       if (String(e).includes("categories_org_name_uq")) {
         throw new ApiError(409, "CATEGORY_EXISTS", "Cette catégorie existe déjà.");
@@ -117,6 +153,58 @@ export async function createCategory(headers: Headers, raw: unknown) {
       throw e;
     }
     return { id, name: body.name };
+  });
+}
+
+/** Update a category (name, order, icon, color). Categories.manage only. */
+export async function updateCategory(headers: Headers, categoryId: string, raw: unknown) {
+  const body = categoryUpdateBody.parse(raw);
+  const { userId, orgId } = await requireActiveOrg(headers);
+  return withTenantDb(orgId, async (db) => {
+    await authorize(db, { userId, permission: "categories.manage" });
+    const existing = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.id, categoryId))
+      .limit(1);
+    if (existing.length === 0) {
+      throw new ApiError(404, "NOT_FOUND", "Catégorie introuvable.");
+    }
+    const patch: Record<string, unknown> = {};
+    if (body.name !== undefined) patch.name = body.name;
+    if (body.sortOrder !== undefined) patch.sortOrder = body.sortOrder;
+    if (body.icon !== undefined) patch.icon = body.icon;
+    if (body.color !== undefined) patch.color = body.color;
+    await db.update(categories).set(patch).where(eq(categories.id, categoryId));
+    return { ok: true };
+  });
+}
+
+/**
+ * Delete a category. Products in it are kept but their category is cleared
+ * (categoryId → null) — a product is never destroyed by a category cleanup.
+ * Categories.manage only.
+ */
+export async function deleteCategory(headers: Headers, categoryId: string) {
+  const { userId, orgId } = await requireActiveOrg(headers);
+  return withTenantDb(orgId, async (db) => {
+    await authorize(db, { userId, permission: "categories.manage" });
+    const existing = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.id, categoryId))
+      .limit(1);
+    if (existing.length === 0) {
+      throw new ApiError(404, "NOT_FOUND", "Catégorie introuvable.");
+    }
+    // Clear the category reference on products (FK is ON DELETE no action,
+    // but we set it to null rather than cascade-destroy anything).
+    await db
+      .update(products)
+      .set({ categoryId: null })
+      .where(eq(products.categoryId, categoryId));
+    await db.delete(categories).where(eq(categories.id, categoryId));
+    return { ok: true };
   });
 }
 
@@ -169,6 +257,7 @@ export async function listProducts(headers: Headers, query: URLSearchParams) {
         unit: products.unit,
         isActive: products.isActive,
         lowStockThreshold: products.lowStockThreshold,
+        taxFree: products.taxFree,
         categoryId: products.categoryId,
         categoryName: sql<string>`${categories.name}`,
       })
@@ -242,6 +331,7 @@ export async function createProduct(headers: Headers, raw: unknown) {
         costUsdMinor: body.costUsdMinor ?? null,
         costCdfMinor: body.costCdfMinor ?? null,
         lowStockThreshold: body.lowStockThreshold ?? null,
+        taxFree: body.taxFree ?? false,
       });
     } catch (e) {
       if (String(e).includes("products_org_sku_uq")) {
@@ -292,6 +382,7 @@ export async function updateProduct(
     if (body.costCdfMinor !== undefined) patch.costCdfMinor = body.costCdfMinor;
     if (body.lowStockThreshold !== undefined) patch.lowStockThreshold = body.lowStockThreshold;
     if (body.isActive !== undefined) patch.isActive = body.isActive;
+    if (body.taxFree !== undefined) patch.taxFree = body.taxFree;
     try {
       await db.update(products).set(patch).where(eq(products.id, productId));
     } catch (e) {

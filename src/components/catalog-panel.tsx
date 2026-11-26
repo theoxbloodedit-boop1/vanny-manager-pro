@@ -35,6 +35,9 @@ import { formatMinor, toMinor } from "@/lib/money";
 interface Category {
   id: string;
   name: string;
+  sortOrder: number;
+  icon: string | null;
+  color: string | null;
 }
 interface Product {
   id: string;
@@ -45,6 +48,7 @@ interface Product {
   unit: string;
   isActive: boolean;
   lowStockThreshold: number | null;
+  taxFree: boolean;
   categoryId: string | null;
   categoryName: string | null;
   priceUsdMinor: number | null;
@@ -93,8 +97,9 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
   const [priceUsd, setPriceUsd] = useState("");
   const [priceCdf, setPriceCdf] = useState("");
   const [threshold, setThreshold] = useState("");
-  const [newCat, setNewCat] = useState("");
-  const [newCatBusy, setNewCatBusy] = useState(false);
+  const [taxFree, setTaxFree] = useState(false);
+  const [costUsd, setCostUsd] = useState("");
+  const [costCdf, setCostCdf] = useState("");
 
   async function run(key: string, fn: () => Promise<unknown>) {
     setBusy(key);
@@ -106,22 +111,6 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
       setError(e instanceof Error ? e.message : "Erreur");
     } finally {
       setBusy(undefined);
-    }
-  }
-
-  async function addCategory() {
-    const c = newCat.trim();
-    if (!c) return;
-    setNewCatBusy(true);
-    setError("");
-    try {
-      await postJson("/api/categories", { name: c });
-      setNewCat("");
-      invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
-    } finally {
-      setNewCatBusy(false);
     }
   }
 
@@ -137,10 +126,13 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
         categoryId: category || null,
         kind,
         unit: unit.trim() || "pièce",
+        taxFree,
         prices,
       };
       if (sku.trim()) body.sku = sku.trim();
       if (threshold.trim()) body.lowStockThreshold = Number(threshold);
+      if (costUsd.trim()) body.costUsdMinor = toMinor(Number(costUsd), "USD");
+      if (costCdf.trim()) body.costCdfMinor = toMinor(Number(costCdf), "CDF");
       await postJson("/api/products", body);
       setName("");
       setCategory("");
@@ -150,6 +142,9 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
       setPriceUsd("");
       setPriceCdf("");
       setThreshold("");
+      setTaxFree(false);
+      setCostUsd("");
+      setCostCdf("");
       setOpen(false);
     });
   }
@@ -209,31 +204,12 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Huile 1L" />
               </Field>
               <Field label="Catégorie">
-                <div className="flex gap-2">
-                  <Select value={category} onChange={(e) => setCategory(e.target.value)}>
-                    <option value="">— aucune —</option>
-                    {(categories.data ?? []).map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </Select>
-                  <Input
-                    value={newCat}
-                    onChange={(e) => setNewCat(e.target.value)}
-                    placeholder="Nouvelle…"
-                    className="w-32"
-                    onKeyDown={(e) =>
-                      e.key === "Enter" && (e.preventDefault(), addCategory())
-                    }
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  className="mt-1 h-7 text-xs"
-                  onClick={addCategory}
-                  disabled={newCatBusy || !newCat.trim()}
-                >
-                  {newCatBusy ? <Spinner /> : "Ajouter la catégorie"}
-                </Button>
+                <Select value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="">— aucune —</option>
+                  {(categories.data ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </Select>
               </Field>
               <Field label="Type">
                 <Select value={kind} onChange={(e) => setKind(e.target.value as "product" | "service")}>
@@ -262,7 +238,24 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
               <Field label="Prix CDF">
                 <Input type="number" min={0} step="1" value={priceCdf} onChange={(e) => setPriceCdf(e.target.value)} placeholder="5000" />
               </Field>
+              <Field label="Coût USD (interne, optionnel)">
+                <Input type="number" min={0} step="0.01" value={costUsd} onChange={(e) => setCostUsd(e.target.value)} placeholder="1.80" />
+              </Field>
+              <Field label="Coût CDF (interne, optionnel)">
+                <Input type="number" min={0} step="1" value={costCdf} onChange={(e) => setCostCdf(e.target.value)} placeholder="4500" />
+              </Field>
             </div>
+            <label className="flex items-center gap-2 rounded-control bg-surface-inset p-2.5">
+              <input
+                type="checkbox"
+                checked={taxFree}
+                onChange={(e) => setTaxFree(e.target.checked)}
+                className="size-4"
+              />
+              <span className="text-sm font-medium">
+                En franchise de taxe (pharmacie, agro)
+              </span>
+            </label>
             <ApiErrorText error={error} />
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
@@ -298,6 +291,9 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
                     {p.name}
                     {p.kind === "service" && (
                       <span className="ml-2 inline-flex"><Badge>service</Badge></span>
+                    )}
+                    {p.taxFree && (
+                      <span className="ml-2 inline-flex"><Badge tone="success">franchise</Badge></span>
                     )}
                     {p.lowStock && (
                       <span className="ml-2 inline-flex">

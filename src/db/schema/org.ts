@@ -41,6 +41,21 @@ export const organizations = pgTable(
      * fail-closed (unknown value → neutral render, never a 500).
      */
     themeId: text("theme_id"),
+    /**
+     * ADR-0020 — tenant BRANDING. Display name shown in the tenant header /
+     * login. NULL = fall back to the org `name`.
+     */
+    brandName: text("brand_name"),
+    /**
+     * ADR-0020 — tenant logo (data URL, base64). Shown in header + login.
+     * NULL = use the VANNY mark. Validated app-side (image type + max size).
+     */
+    logoUrl: text("logo_url"),
+    /**
+     * ADR-0020 — accent color override (#RRGGBB). NULL = use the theme's
+     * accent. Validated app-side; unknown → theme accent (fail-closed).
+     */
+    brandColor: text("brand_color"),
     settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

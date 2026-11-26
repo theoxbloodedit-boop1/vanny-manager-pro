@@ -392,7 +392,7 @@ describe("ADR-0014 — secure invitation adaptation", () => {
     branchBId = orgB.branchId;
   });
 
-  it("an unverified, unapproved user is refused; after approval they accept their OWN invitation", async () => {
+  it("a user holding a valid pending invitation can accept without email verification (ADR-0020: the invitation is the trust anchor)", async () => {
     const inv = await inviteMember(alice.headers, {
       email: "eve@example.cd",
       role: "cashier",
@@ -401,21 +401,11 @@ describe("ADR-0014 — secure invitation adaptation", () => {
 
     const eve = await signup("Eve Invitee", "eve@example.cd");
 
-    // Unverified + unapproved → refused by our ADR-0014 gate.
-    await expect(
-      acceptInvitation(eve.headers, { invitationId: inv.invitationId }),
-    ).rejects.toThrow(/verified or manually approved/i);
-
-    // Manual approval (identity from a verified token) — email still unverified.
-    await applyManualApproval({
-      operatorId: verifiedOperatorId("operator-eve"),
-      userEmail: "eve@example.cd",
-      action: "approve",
-      reason: "identity confirmed via WhatsApp call (test)",
-    });
-    expect((await readFlags("eve@example.cd")).emailVerified).toBe(false);
-
-    // Now she accepts her own invitation.
+    // ADR-0020: Eve holds a VALID PENDING invitation for this org — the
+    // invitation itself is the trust anchor (the owner vouched for her by
+    // emailing it). She can accept WITHOUT email verification or manual
+    // approval. This is what makes invitations work end-to-end without a
+    // mailbox (no Resend configured).
     await acceptInvitation(eve.headers, { invitationId: inv.invitationId });
 
     // She is a member of org A; her email is STILL unverified.
@@ -426,6 +416,15 @@ describe("ADR-0014 — secure invitation adaptation", () => {
     expect(mem.rows).toHaveLength(1);
     expect(mem.rows[0].role).toBe("cashier");
     expect((await readFlags("eve@example.cd")).emailVerified).toBe(false);
+  });
+
+  it("a user with NO valid invitation, unverified and unapproved, is refused (ADR-0020 gate)", async () => {
+    // An account with no invitation at all, and neither verified nor
+    // approved, cannot accept a foreign/nonexistent invitation — fail closed.
+    const eve = await signup("Eve Nobody", "eve-nobody@example.cd");
+    await expect(
+      acceptInvitation(eve.headers, { invitationId: "00000000-0000-0000-0000-000000000000" }),
+    ).rejects.toThrow(/verified or manually approved/i);
   });
 
   it("a manually-approved user still CANNOT view the invitation list (list stays strict)", async () => {
@@ -904,10 +903,10 @@ describe("ADR-0014 — permission isolation & approval-revocation effect", () =>
     // 3) Invitation list is strict (unverified) — 403.
     await expect(myInvitations(eve.headers)).rejects.toThrow(/verification/i);
 
-    // 4) Cannot accept (not verified, not approved).
-    await expect(
-      acceptInvitation(eve.headers, { invitationId: inv.invitationId }),
-    ).rejects.toThrow(/verified or manually approved/i);
+    // 4) ADR-0020: before accepting, she has NO access (points 1-3 hold).
+    //    But she CAN accept the invitation — the pending invitation IS the
+    //    trust anchor — which is the sanctioned path IN.
+    await acceptInvitation(eve.headers, { invitationId: inv.invitationId });
   });
 
   it("revoking an approval does NOT auto-log-out the user or remove their membership", async () => {
@@ -976,10 +975,10 @@ describe("ADR-0014 — permission isolation & approval-revocation effect", () =>
       reason: "revoked (test)",
     });
     expect((await readFlags("eve-blocked@example.cd")).manuallyApproved).toBe(false);
-    // Now unverified + unapproved → the pending invitation can no longer be accepted.
-    await expect(
-      acceptInvitation(eve.headers, { invitationId: inv.invitationId }),
-    ).rejects.toThrow(/verified or manually approved/i);
+    // ADR-0020: manual-approval revocation no longer blocks acceptance when a
+    // VALID PENDING invitation exists — the invitation, not the approval, is
+    // the trust anchor for invited users. She can still accept her invitation.
+    await acceptInvitation(eve.headers, { invitationId: inv.invitationId });
   });
 
   it("revoking an approval IMMEDIATELY blocks sensitive ops on an active session (membership/session intact)", async () => {

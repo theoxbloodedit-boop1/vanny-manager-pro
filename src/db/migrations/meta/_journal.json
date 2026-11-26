@@ -57,6 +57,13 @@
       "when": 1795710815217,
       "tag": "0008_platform_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795712000000,
+      "tag": "0009_branding_advanced",
+      "breakpoints": true
     }
   ]
 }

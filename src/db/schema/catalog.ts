@@ -30,10 +30,20 @@ export const categories = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     parentId: uuid("parent_id").references((): AnyPgColumn => categories.id),
     name: text("name").notNull(),
+    /**
+     * ADR-0020 — advanced catalogue: explicit display order (lower = first).
+     * NULL/0 = unordered (shown by createdAt).
+     */
+    sortOrder: integer("sort_order").notNull().default(0),
+    /** Optional lucide icon name for the category (advanced catalogue). */
+    icon: text("icon"),
+    /** Optional accent color (#RRGGBB) for the category chip. */
+    color: text("color"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("categories_org_idx").on(t.orgId),
+    index("categories_org_sort_idx").on(t.orgId, t.sortOrder),
     uniqueIndex("categories_org_name_uq").on(t.orgId, t.name),
     tenantIsolationPolicy(t.orgId),
   ],
@@ -55,6 +65,12 @@ export const products = pgTable(
     /** Pharmacy extension point — reserved, not implemented in v1. */
     trackExpiry: boolean("track_expiry").notNull().default(false),
     batchRequired: boolean("batch_required").notNull().default(false),
+    /**
+     * ADR-0020 — advanced catalogue: tax-exempt flag (pharmacy/agro). When
+     * true the product is not subject to sales tax (modeled at the POS layer
+     * in Phase 3). Default false.
+     */
+    taxFree: boolean("tax_free").notNull().default(false),
     /** Cost basis stays here: internal, not customer-facing. */
     costUsdMinor: bigint("cost_usd_minor", { mode: "number" }),
     costCdfMinor: bigint("cost_cdf_minor", { mode: "number" }),

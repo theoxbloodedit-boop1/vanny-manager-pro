@@ -37,6 +37,10 @@ export interface Me {
     timezone: string | null;
     /** ADR-0015: tenant tone (static catalog id) or null = neutral. */
     themeId: string | null;
+    /** ADR-0020: tenant branding — display name, logo, accent override. */
+    brandName: string | null;
+    logoUrl: string | null;
+    brandColor: string | null;
   } | null;
   role?: string | null;
 }
@@ -86,11 +90,17 @@ export async function getMe(headers: Headers): Promise<Me> {
           timezone?: string | null;
         }
       | null;
-    // ADR-0015: the tone lives on the RLS-scoped org row (the plugin's
-    // response is not typed for it) — one extra tiny read, same scoping.
+    // ADR-0015/0020: the tone + branding live on the RLS-scoped org row (the
+    // plugin's response is not typed for them) — one extra tiny read, same
+    // scoping.
     const themeRows = await withTenantDb(orgId, (db) =>
       db
-        .select({ themeId: organizations.themeId })
+        .select({
+          themeId: organizations.themeId,
+          brandName: organizations.brandName,
+          logoUrl: organizations.logoUrl,
+          brandColor: organizations.brandColor,
+        })
         .from(organizations)
         .where(eq(organizations.id, orgId))
         .limit(1),
@@ -104,6 +114,9 @@ export async function getMe(headers: Headers): Promise<Me> {
         baseCurrency: org.baseCurrency ?? "",
         timezone: org.timezone ?? null,
         themeId: themeRows[0]?.themeId ?? null,
+        brandName: themeRows[0]?.brandName ?? null,
+        logoUrl: themeRows[0]?.logoUrl ?? null,
+        brandColor: themeRows[0]?.brandColor ?? null,
       };
     }
   } catch {

@@ -4,7 +4,7 @@ import { getAuthDb } from "../auth/db";
 import { getAuth } from "../auth";
 import { withTenantDb } from "../db/tenant";
 import { branches, branchAccess } from "../db/schema/org";
-import { members, users } from "../db/schema/auth";
+import { invitations, members, users } from "../db/schema/auth";
 import { uuidv7 } from "../lib/uuid";
 import { ApiError } from "./errors";
 import { isManuallyApproved } from "./manual-approval";
@@ -125,7 +125,13 @@ const inviteableRoles = ROLES.filter((r) => r !== "owner") as [Role, ...Role[]];
 const inviteBody = z.object({
   email: z.string().email().max(200),
   role: z.enum(inviteableRoles),
-  branchIds: z.array(z.string().uuid()).min(1).max(50),
+  /**
+   * ADR-0020: branch grants are now OPTIONAL. An owner can invite someone to
+   * the organization with no branch access yet (granted later via the branch
+   * access panel). Previously >= 1 branch was required, which blocked
+   * invitations for orgs with no branch set up.
+   */
+  branchIds: z.array(z.string().uuid()).max(50).optional(),
 });
 
 /**
@@ -139,18 +145,27 @@ export async function inviteMember(headers: Headers, raw: unknown) {
   const body = inviteBody.parse(raw);
   const { userId, orgId } = await requireActiveOrg(headers);
 
+  const wantedBranchIds = body.branchIds ? [...new Set(body.branchIds)] : [];
+
   // Branches must belong to this org (RLS-scoped: foreign ids yield no rows).
-  const valid = await withTenantDb(orgId, async (db) => {
-    await authorize(db, { userId, permission: "members.invite" });
-    const wanted = [...new Set(body.branchIds)];
-    const rows = await db
-      .select({ id: branches.id })
-      .from(branches)
-      .where(inArray(branches.id, wanted));
-    return rows.length === wanted.length;
-  });
-  if (!valid) {
-    throw new ApiError(400, "INVALID_BRANCH", "Unknown branch for this organization");
+  // Skip the check entirely when no branches are requested (invite with no
+  // branch access yet).
+  if (wantedBranchIds.length > 0) {
+    const valid = await withTenantDb(orgId, async (db) => {
+      await authorize(db, { userId, permission: "members.invite" });
+      const rows = await db
+        .select({ id: branches.id })
+        .from(branches)
+        .where(inArray(branches.id, wantedBranchIds));
+      return rows.length === wantedBranchIds.length;
+    });
+    if (!valid) {
+      throw new ApiError(400, "INVALID_BRANCH", "Unknown branch for this organization");
+    }
+  } else {
+    await withTenantDb(orgId, (db) =>
+      authorize(db, { userId, permission: "members.invite" }),
+    );
   }
 
   const auth = getAuth();
@@ -159,7 +174,7 @@ export async function inviteMember(headers: Headers, raw: unknown) {
       email: body.email,
       role: body.role,
       organizationId: orgId,
-      branchIds: JSON.stringify([...new Set(body.branchIds)]),
+      branchIds: JSON.stringify(wantedBranchIds),
     },
     headers,
   });
@@ -285,21 +300,56 @@ export async function acceptInvitation(headers: Headers, raw: unknown) {
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
   if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
-  // ADR-0014 verification gate. The plugin's own email check on acceptance is
-  // disabled (requireEmailVerificationOnInvitation: false), so we enforce it
-  // here: a user may accept if their email is VERIFIED or they are MANUALLY
-  // APPROVED (audited operator action). Approval NEVER implies emailVerified.
-  // The plugin STILL enforces the invitation token (valid/expiring/single-use),
+  // ADR-0014 verification gate, ADR-0020 revised. The plugin's own email
+  // check on acceptance is disabled (requireEmailVerificationOnInvitation:
+  // false), so we enforce it here. A user may accept if their email is
+  // VERIFIED or they are MANUALLY APPROVED (audited operator action).
+  //
+  // ADR-0020: a user who holds a VALID PENDING invitation for this org is
+  // ALSO allowed to accept, because the invitation itself is the trust anchor
+  // — the owner vouched for this specific person by emailing them the
+  // invitation. This is what makes invitations work end-to-end WITHOUT a
+  // working mailbox (no Resend): the invitee signs up with the invited email
+  // (pre-filled by the shared link) and accepts immediately. The plugin STILL
+  // enforces the invitation token (valid/expiring/single-use), the
   // recipient-email match (cross-tenant acceptance is impossible by
-  // construction), and permission control — the link's security is unchanged.
+  // construction), and permission control — the link's security is
+  // unchanged. Approval never implies emailVerified.
   if (!session.user.emailVerified) {
     const approved = await isManuallyApproved(session.user.id);
-    if (!approved) {
-      throw new ApiError(
-        403,
-        "VERIFICATION_REQUIRED",
-        "This account must be verified or manually approved before accepting an invitation.",
-      );
+    if (approved) {
+      // fall through to accept
+    } else {
+      // ADR-0020: check whether THIS user holds the VALID PENDING invitation
+      // they are accepting — by a direct platform lookup on the invitation
+      // row (NOT via listUserInvitations, which is itself email-gated and
+      // would fail for an unverified user). The invitation is the trust
+      // anchor: the owner vouched for this specific recipient by emailing the
+      // invitation. We verify the recipient email matches the session user
+      // and the invitation is pending + unexpired. Fail-closed otherwise.
+      const db = getAuthDb();
+      const invRows = await db
+        .select({
+          email: invitations.email,
+          status: invitations.status,
+          expiresAt: invitations.expiresAt,
+        })
+        .from(invitations)
+        .where(eq(invitations.id, body.invitationId))
+        .limit(1);
+      const inv = invRows[0];
+      const held =
+        inv !== undefined &&
+        inv.status === "pending" &&
+        inv.email.toLowerCase() === session.user.email.toLowerCase() &&
+        (inv.expiresAt.getTime() > Date.now());
+      if (!held) {
+        throw new ApiError(
+          403,
+          "VERIFICATION_REQUIRED",
+          "This account must be verified or manually approved before accepting an invitation.",
+        );
+      }
     }
   }
   return auth.api.acceptInvitation({ body: { invitationId: body.invitationId }, headers });
