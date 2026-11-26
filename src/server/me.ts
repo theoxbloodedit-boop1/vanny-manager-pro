@@ -72,7 +72,35 @@ export async function getMe(headers: Headers): Promise<Me> {
     role: null,
   };
 
-  const orgId = session.session.activeOrganizationId;
+  // ADR-0021 (reconnect): une nouvelle session n'a pas d'organisation active.
+  // Si l'utilisateur est déjà membre d'une organisation, on retrouve sa
+  // membership et on restaure l'org active dans la session — sinon il retombe
+  // sur l'onboarding et peut recréer une activité en double. Owner en priorité.
+  let orgId = session.session.activeOrganizationId;
+  if (!orgId) {
+    const membershipRows = await getAuthDb()
+      .select({ organizationId: members.organizationId, role: members.role })
+      .from(members)
+      .where(eq(members.userId, session.user.id));
+    if (membershipRows.length > 0) {
+      const ownerFirst = [...membershipRows].sort((a, b) => {
+        const aOwner = a.role.includes("owner") ? 0 : 1;
+        const bOwner = b.role.includes("owner") ? 0 : 1;
+        return aOwner - bOwner;
+      });
+      orgId = ownerFirst[0]?.organizationId;
+      try {
+        await auth.api.setActiveOrganization({
+          headers,
+          body: { organizationId: orgId },
+        });
+      } catch {
+        // Si la restauration échoue (session non persistable, etc.), on
+        // expose quand même l'org pour ce rendu — le routage post-auth
+        // l'envoie sur son tableau de bord.
+      }
+    }
+  }
   if (!orgId) return me;
 
   // Organization metadata — the plugin enforces membership.

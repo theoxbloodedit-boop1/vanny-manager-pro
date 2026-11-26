@@ -57,3 +57,7 @@ compat-check/
 # typescript incremental build info
 *.tsbuildinfo
 .neon
+
+# test artifacts (embedded postgres data dirs)
+undefined/
+*.postgresql

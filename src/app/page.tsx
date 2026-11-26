@@ -5,70 +5,126 @@ import {
   Check,
   Clock,
   KeyRound,
+  Pill,
   ShieldCheck,
+  Scissors,
   Store,
   Users,
+  UtensilsCrossed,
+  Wine,
 } from "lucide-react";
 import { Logo, LogoMark } from "@/components/ui";
 
 export const dynamic = "force-static";
 
 /**
- * Page d'accueil — vitrine produit.
+ * Page d'accueil — vitrine SaaS.
  *
- * Règle du produit (inchangée) : on n'affiche jamais une fonctionnalité
- * qui n’existe pas. La section « En préparation » le rappelle explicitement.
- * Le mockup ci-dessous reproduit l'écran d'administration réel.
+ * Règle du produit : on n'affiche jamais une fonctionnalité qui n'existe pas.
+ * La page doit faire comprendre le SaaS en 10 secondes :
+ *   1. CE QUE C'EST   — un espace pour gérer une activité de commerce
+ *   2. POUR QUI       — pharmacie, bar, restaurant, salon, boutique
+ *   3. POURQUOI       — contrôle total, équipes, devises, multi-succursales
  */
 
-const VALUE_PROPS = [
+const SECTORS = [
   {
-    icon: ShieldCheck,
-    title: "Isolé, de bout en bout",
-    text: "Chaque organisation vit dans son propre espace, isolé en base (RLS). Vos données ne se mélangent jamais à celles d'un autre client.",
+    id: "boutique",
+    label: "Boutique",
+    icon: Store,
+    promise:
+      "Catalogue de produits, stock, prix en USD et CDF — sans jamais les confondre.",
   },
   {
-    icon: Banknote,
-    title: "USD et CDF, sans confusion",
-    text: "Deux devises gérées côte à côte, jamais converties silencieusement. Les prix restent ce que vous avez saisi.",
+    id: "bar",
+    label: "Bar",
+    icon: Wine,
+    promise:
+      "Inventaire des consommations, équipes de soirée et succursales qui restent ordonnées.",
+  },
+  {
+    id: "restaurant",
+    label: "Restaurant",
+    icon: UtensilsCrossed,
+    promise:
+      "Produits, stock et équipes de salle : tout ce qui se passe en cuisine et en caisse, suivi.",
+  },
+  {
+    id: "salon",
+    label: "Salon / beauté",
+    icon: Scissors,
+    promise:
+      "Prestations, stock de produits et collaborateurs : une activité de service qui reste contrôlée.",
+  },
+  {
+    id: "pharmacy",
+    label: "Pharmacie",
+    icon: Pill,
+    promise:
+      "Références, stock rigoureux et facturation : une activité sensible, gérée avec précision.",
+  },
+] as const;
+
+const WHY = [
+  {
+    icon: ShieldCheck,
+    title: "Un contrôle total, en un tableau de bord",
+    text: "Organisation, catalogue, stock, équipes, succursales, branding : tout est visible et piloté depuis un même espace admin.",
   },
   {
     icon: Users,
-    title: "Équipes et rôles clairs",
-    text: "Propriétaire, manager, caissier, comptable… chaque membre agit exactement là où il en a le droit, partout ailleurs bloqué.",
+    title: "Équipes et rôles qui tiennent",
+    text: "Propriétaire, manager, caissier, comptable… chacun agit exactement là où il en a le droit, partout ailleurs il est bloqué.",
+  },
+  {
+    icon: Banknote,
+    title: "USD et CDF, côte à côte",
+    text: "Deux devises gérées séparément, jamais converties silencieusement. Les prix restent ce que vous avez saisi.",
   },
   {
     icon: Store,
-    title: "Multi-succursales",
-    text: "Un membre ne travaille que dans les succursales qui lui sont assignées. Vous voyez tout, chacun ne voit que son périmètre.",
+    title: "Multi-succursales, isolé",
+    text: "Une activité peut avoir plusieurs succursales. Un membre ne travaille que dans celles qui lui sont assignées.",
   },
-];
+  {
+    icon: KeyRound,
+    title: "Invitations qui fonctionnent",
+    text: "Vos collaborateurs rejoignent par invitation. Une invitation valide est une confiance — pas besoin d'email confirmé.",
+  },
+  {
+    icon: Check,
+    title: "Une promesse tenue : on n'invente rien",
+    text: "Chaque fonctionnalité affichée ici est réelle, déployée et testée. Tout ce qui n'est pas prêt est dit explicitement.",
+  },
+] as const;
 
 const STEPS = [
   {
     title: "Créez votre compte",
-    text: "Deux minutes : votre compte, votre organisation, votre première succursale.",
+    text: "Deux minutes : votre compte, votre activité, votre première succursale.",
   },
   {
-    title: "Vérifiez, invitez, assignez",
-    text: "Email vérifié, invitations envoyées, rôles et succursales attribués — sans reconnexion.",
+    title: "Invitez votre équipe",
+    text: "Invitations, rôles et succursales attribués — chacun rejoint dans son périmètre.",
   },
   {
-    title: "Gérez, suivez, grandissez",
-    text: "Ajoutez des succursales et des équipes au fil de la croissance. Tout reste isolé et traçable.",
+    title: "Pilotez au quotidien",
+    text: "Catalogue, stock, équipes, succursales : un contrôle total, revu à chaque connexion.",
   },
 ];
 
 const LIVE = [
-  "Comptes, organisations et succursales, multi-tenant isolé",
-  "Invitations par email avec vérification, rôles et permissions",
-  "Accès par succursale : chacun ne travaille que là où il a le droit",
+  "Organisation, succursales et membres — multi-tenant isolé en base (RLS)",
+  "Catalogue produits, catégories et stock, avec coûts et franchise",
+  "Invitations, rôles et permissions — l'invitation valide est une confiance",
+  "Tableau de bord admin complet : catalogue, stock, équipes, succursales, marque",
+  "Branding personnalisable : nom, logo et couleur de votre activité",
   "Tarifs normalisés USD / CDF, jamais convertis silencieusement",
 ];
 
 const COMING = [
   "Point de vente et caisses (USD et CDF séparés)",
-  "Stock, transferts inter-succursales, clients et fournisseurs",
+  "Transferts de stock inter-succursales",
   "Mode hors-ligne testé sur appareil Android",
 ];
 
@@ -182,22 +238,22 @@ export default function HomePage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 sm:px-6">
-        {/* Hero */}
+        {/* Hero — la réponse en 10 secondes */}
         <section className="grid items-center gap-10 py-14 md:grid-cols-2 md:gap-12 md:py-20">
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted-foreground">
               <ShieldCheck className="size-3.5 text-primary" aria-hidden />
-              Multi-tenant isolé · Conçu pour la RDC
+              Le SaaS de gestion pour vos commerces — conçu pour la RDC
             </span>
             <h1 className="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl">
-              Votre activité,
+              Gérez votre commerce,
               <br />
-              <span className="text-primary">gérée proprement.</span>
+              <span className="text-primary">tout en un seul espace.</span>
             </h1>
             <p className="mt-5 max-w-md text-base leading-7 text-muted-foreground">
-              Ventes, stock, caisses et équipes dans un seul espace.
-              Multi-succursales, rôles clairs, USD et CDF côte à côte — sans
-              jamais les confondre.
+              VANNY est une plateforme SaaS pour les petites et moyennes activités de
+              commerce. Une seule connexion, un contrôle total sur votre catalogue,
+              votre stock, vos équipes et vos succursales.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <Link
@@ -214,31 +270,28 @@ export default function HomePage() {
                 Se connecter
               </Link>
             </div>
-            <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-muted-foreground">
-              {["Boutiques", "Bars", "Restaurants", "Salons", "Pharmacies"].map((s) => (
-                <li key={s} className="flex items-center gap-1.5">
-                  <Check className="size-3.5 text-success" aria-hidden />
-                  {s}
-                </li>
-              ))}
-            </ul>
+            <p className="mt-7 text-xs font-medium text-muted-foreground">
+              Pharmacie · Bar · Restaurant · Salon · Boutique — chaque activité
+              est structurée et optimisée selon son métier.
+            </p>
           </div>
           <Mockup />
         </section>
 
-        {/* Valeurs */}
+        {/* Pourquoi nous choisir */}
         <section className="pb-14 md:pb-20">
           <div className="mb-8 max-w-xl">
             <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Construit pour la confiance
+              Pourquoi nous choisir
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              De l’argent et du stock de plusieurs activités passent par VANNY.
-              Chaque choix est fait pour que rien ne fuite, rien ne se mélange.
+              Le SaaS ne doit pas être une boîte noire. VANNY est pensé pour le
+              contrôle, la clarté et la confiance — pas seulement pour faire
+              fonctionner des tables.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {VALUE_PROPS.map((v) => (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {WHY.map((v) => (
               <div
                 key={v.title}
                 className="rounded-card border border-border bg-surface-raised p-5 shadow-card"
@@ -253,8 +306,37 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Comment ça marche */}
+        {/* Optimisé par activité */}
         <section className="border-y border-border bg-surface py-14 md:py-16">
+          <div className="mb-8 max-w-xl">
+            <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+              Une plateforme optimisée selon votre activité
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Chaque métier a ses besoins. VANNY structure votre activité dès le
+              départ, avec les modules adaptés à ce que vous faites chaque jour.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {SECTORS.map((s) => (
+              <div
+                key={s.id}
+                className="rounded-card border border-border bg-surface-raised p-5 shadow-card"
+              >
+                <span className="flex size-11 items-center justify-center rounded-control bg-primary-soft text-primary">
+                  <s.icon className="size-5.5" aria-hidden />
+                </span>
+                <h3 className="mt-4 font-bold tracking-tight">{s.label}</h3>
+                <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+                  {s.promise}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Comment ça marche */}
+        <section className="py-14 md:py-16">
           <div className="mb-8 max-w-xl">
             <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
               Opérationnel en trois étapes
@@ -277,7 +359,7 @@ export default function HomePage() {
         </section>
 
         {/* Statut honnête */}
-        <section className="py-14 md:py-16">
+        <section className="border-t border-border bg-surface py-14 md:py-16">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-card border border-border bg-surface-raised p-5 shadow-card">
               <div className="mb-4 flex items-center gap-2.5">
@@ -288,7 +370,10 @@ export default function HomePage() {
               </div>
               <ul className="space-y-2.5">
                 {LIVE.map((item) => (
-                  <li key={item} className="flex items-start gap-2.5 text-sm leading-6 text-foreground">
+                  <li
+                    key={item}
+                    className="flex items-start gap-2.5 text-sm leading-6 text-foreground"
+                  >
                     <Check className="mt-1 size-4 shrink-0 text-success" aria-hidden />
                     {item}
                   </li>
@@ -307,7 +392,10 @@ export default function HomePage() {
               </div>
               <ul className="space-y-2.5">
                 {COMING.map((item) => (
-                  <li key={item} className="flex items-start gap-2.5 text-sm leading-6 text-muted-foreground">
+                  <li
+                    key={item}
+                    className="flex items-start gap-2.5 text-sm leading-6 text-muted-foreground"
+                  >
                     <Clock className="mt-1 size-4 shrink-0" aria-hidden />
                     {item}
                   </li>
@@ -321,11 +409,12 @@ export default function HomePage() {
         <section className="pb-16 md:pb-20">
           <div className="overflow-hidden rounded-card border border-border bg-gradient-to-br from-primary-faint via-background to-primary-soft/70 p-8 text-center shadow-card sm:p-12">
             <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Prêt à gérer proprement ?
+              Prêt à gérer votre activité proprement ?
             </h2>
             <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
               Créez votre organisation maintenant. Vos équipes rejoignent par
-              invitation, chacune dans son périmètre.
+              invitation, chacune dans son périmètre. Et à chaque reconnexion,
+              vous retombez sur votre tableau de bord — pas sur une création.
             </p>
             <Link
               href="/auth"
