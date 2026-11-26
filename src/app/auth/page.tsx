@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { signInEmail, signUpEmail } from "@/lib/auth-client";
-import { ApiErrorText, Button, Field, Input } from "@/components/ui";
+import { ApiErrorText, Button, Field, Input, Logo, Segmented } from "@/components/ui";
 
 /**
  * Connexion / Inscription (Module A).
@@ -40,45 +41,33 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-6">
-      <header className="flex items-center gap-3">
-        <span className="flex size-11 items-center justify-center rounded-card bg-primary text-white">
-          <span className="text-xl font-bold">V</span>
-        </span>
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">
-            VANNY MANAGER PRO
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {mode === "signin" ? "Content de vous revoir" : "Créez votre compte"}
-          </p>
-        </div>
-      </header>
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 p-6">
+      <div className="flex justify-center">
+        <Logo />
+      </div>
 
-      <div className="rounded-card border border-border bg-surface-raised p-5 shadow-sm">
-        <div className="mb-5 grid grid-cols-2 gap-1 rounded-control bg-surface p-1">
-          {(
-            [
-              ["signin", "Connexion"],
-              ["signup", "Inscription"],
-            ] as const
-          ).map(([m, label]) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => {
-                setMode(m);
-                setError(undefined);
-              }}
-              className={`min-h-10 rounded-[0.5rem] text-sm font-semibold transition-colors ${
-                mode === m
-                  ? "bg-surface-raised text-foreground shadow-sm"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="rounded-card border border-border bg-surface-raised p-5 shadow-card sm:p-6">
+        <div className="mb-5">
+          <Segmented
+            className="grid-cols-2"
+            value={mode}
+            onChange={(m) => {
+              setMode(m);
+              setError(undefined);
+            }}
+            options={[
+              { value: "signin", label: "Connexion" },
+              { value: "signup", label: "Inscription" },
+            ]}
+          />
+          <h1 className="mt-5 text-lg font-bold tracking-tight">
+            {mode === "signin" ? "Content de vous revoir" : "Créez votre compte"}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {mode === "signin"
+              ? "Accédez à votre organisation."
+              : "Deux minutes, puis vous invitez votre équipe."}
+          </p>
         </div>
 
         <form onSubmit={submit} className="space-y-4">
@@ -130,9 +119,9 @@ export default function AuthPage() {
         </form>
       </div>
 
-      <p className="text-center text-xs text-muted-foreground">
-        Vos données restent dans votre organisation, isolées des autres
-        clients.
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+        <ShieldCheck className="size-3.5 text-success" aria-hidden />
+        Vos données restent dans votre organisation, isolées des autres clients.
       </p>
     </main>
   );

@@ -3,7 +3,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiErrorText, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Check, Pill, Scissors, Store, UtensilsCrossed, Wine } from "lucide-react";
+import {
+  ApiErrorText,
+  Button,
+  Card,
+  Field,
+  Input,
+  Logo,
+  Segmented,
+  Select,
+  Spinner,
+} from "@/components/ui";
 
 /**
  * Onboarding — la première organisation de l'utilisateur (Module A).
@@ -14,12 +25,14 @@ import { ApiErrorText, Button, Card, Field, Input, Select, Spinner } from "@/com
  */
 
 const SECTORS = [
-  ["boutique", "Boutique / commerce"],
-  ["bar", "Bar"],
-  ["restaurant", "Restaurant"],
-  ["salon", "Salon de coiffure / beauté"],
-  ["pharmacy", "Pharmacie"],
+  ["boutique", "Boutique / commerce", Store],
+  ["bar", "Bar", Wine],
+  ["restaurant", "Restaurant", UtensilsCrossed],
+  ["salon", "Salon / beauté", Scissors],
+  ["pharmacy", "Pharmacie", Pill],
 ] as const;
+
+type SectorValue = (typeof SECTORS)[number][0];
 
 const TIMEZONES = [
   "Africa/Kinshasa",
@@ -55,7 +68,7 @@ export default function OnboardingPage() {
   // null = slug auto-généré depuis le nom ; sinon valeur saisie par l'user.
   const [slugDraft, setSlugDraft] = useState<string | null>(null);
   const slug = slugDraft ?? slugify(name);
-  const [sector, setSector] = useState<(typeof SECTORS)[number][0]>("boutique");
+  const [sector, setSector] = useState<SectorValue>("boutique");
   const [baseCurrency, setBaseCurrency] = useState<"USD" | "CDF">("USD");
   const [timezone, setTimezone] = useState<string>("Africa/Kinshasa");
   const [firstBranchName, setFirstBranchName] = useState("");
@@ -110,17 +123,23 @@ export default function OnboardingPage() {
   if (!me.authenticated || me.organization) return null; // redirecting
 
   return (
-    <main className="mx-auto min-h-screen max-w-lg p-6">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold">Créez votre organisation</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <main className="mx-auto min-h-screen w-full max-w-lg p-6">
+      <header className="mb-6 flex items-center gap-3">
+        <Logo compact />
+      </header>
+
+      <div className="mb-6">
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          Créez votre organisation
+        </h1>
+        <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
           Ces informations définissent votre espace de travail. Vous pourrez
           ajouter des succursales et des équipes ensuite.
         </p>
-      </header>
+      </div>
 
-      <Card title="Votre entreprise">
-        <form onSubmit={submit} className="space-y-4">
+      <Card title="Votre entreprise" subtitle="Visible par vos équipes, modifiable plus tard.">
+        <form onSubmit={submit} className="space-y-5">
           <Field label="Nom de l’entreprise">
             <Input
               value={name}
@@ -146,47 +165,71 @@ export default function OnboardingPage() {
                     .slice(0, 48),
                 )
               }
-              pattern="[a-z0-9]+(-[a-z0-9]+)*"
+              pattern="[a-z0-9]+(-[a-z0-9-])*"
               required
               minLength={2}
             />
           </Field>
 
-          <Field label="Secteur d’activité">
-            <Select
-              value={sector}
-              onChange={(e) =>
-                setSector(e.target.value as (typeof SECTORS)[number][0])
-              }
-            >
-              {SECTORS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <div className="space-y-1.5">
+            <span className="text-sm font-semibold text-foreground">
+              Secteur d’activité
+            </span>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {SECTORS.map(([value, label, Icon]) => {
+                const active = sector === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setSector(value)}
+                    aria-pressed={active}
+                    className={`relative flex min-h-16 flex-col items-start gap-1.5 rounded-control border p-3 text-left transition-colors ${
+                      active
+                        ? "border-primary bg-primary-faint ring-2 ring-primary-soft"
+                        : "border-border bg-surface-raised hover:border-border-strong hover:bg-surface"
+                    }`}
+                  >
+                    <span
+                      className={`flex size-8 items-center justify-center rounded-control ${
+                        active ? "bg-primary text-white" : "bg-surface-inset text-muted-foreground"
+                      }`}
+                    >
+                      <Icon className="size-4" aria-hidden />
+                    </span>
+                    <span className={`text-xs font-semibold leading-4 ${active ? "text-primary" : "text-foreground"}`}>
+                      {label}
+                    </span>
+                    {active ? (
+                      <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-white">
+                        <Check className="size-3" aria-hidden />
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-          <Field
-            label="Devise de base"
-            hint="Les prix restent indépendants USD et CDF ; c’est la devise par défaut de votre comptabilité."
-          >
-            <Select
+          <div className="space-y-1.5">
+            <span className="text-sm font-semibold text-foreground">Devise de base</span>
+            <Segmented
+              className="grid-cols-2"
               value={baseCurrency}
-              onChange={(e) =>
-                setBaseCurrency(e.target.value as "USD" | "CDF")
-              }
-            >
-              <option value="USD">USD — Dollar américain</option>
-              <option value="CDF">CDF — Franc congolais</option>
-            </Select>
-          </Field>
+              onChange={setBaseCurrency}
+              options={[
+                { value: "USD", label: "USD — Dollar" },
+                { value: "CDF", label: "CDF — Franc congolais" },
+              ]}
+            />
+            <p className="text-xs leading-5 text-muted-foreground">
+              Les prix restent indépendants USD et CDF ; c’est la devise par
+              défaut de votre comptabilité.
+            </p>
+          </div>
 
           <Field label="Fuseau horaire">
-            <Select
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-            >
+            <Select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
               {TIMEZONES.map((tz) => (
                 <option key={tz} value={tz}>
                   {tz}

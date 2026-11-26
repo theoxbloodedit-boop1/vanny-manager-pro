@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Card, Spinner } from "@/components/ui";
+import { BadgeCheck, Building2, CheckCircle2, Mail } from "lucide-react";
+import { Badge, Button, Card, Logo, Spinner } from "@/components/ui";
 
 /**
  * Post-authentication orchestrator (Module A).
@@ -140,9 +141,13 @@ export default function PostAuthPage() {
   const verified = me.user?.emailVerified;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-5 p-6">
-      <header>
-        <h1 className="text-xl font-semibold">
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-5 p-6">
+      <div className="flex justify-center">
+        <Logo />
+      </div>
+
+      <header className="text-center">
+        <h1 className="text-xl font-extrabold tracking-tight">
           Bonjour {me.user?.name?.split(" ")[0]}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">{me.user?.email}</p>
@@ -152,6 +157,7 @@ export default function PostAuthPage() {
         <Card
           title="Vérifiez votre adresse email"
           subtitle="Nous vous avons envoyé un lien de confirmation. Il protège vos invitations et expire dans 24 heures."
+          icon={Mail}
         >
           <div className="space-y-3">
             {devUrl ? (
@@ -167,7 +173,9 @@ export default function PostAuthPage() {
               onClick={recheckVerification}
               loading={checking}
               disabled={!!devUrl}
+              className="w-full"
             >
+              <CheckCircle2 className="size-4" aria-hidden />
               J’ai vérifié mon email
             </Button>
             {notice ? (
@@ -176,7 +184,7 @@ export default function PostAuthPage() {
           </div>
         </Card>
       ) : invitations.isLoading ? (
-        <Card title="Vos invitations">
+        <Card title="Vos invitations" icon={Mail}>
           <div className="flex justify-center py-4">
             <Spinner />
           </div>
@@ -185,6 +193,7 @@ export default function PostAuthPage() {
         <Card
           title="Vous avez une invitation"
           subtitle="Un membre de votre équipe vous a invité."
+          icon={BadgeCheck}
         >
           <div className="space-y-4">
             {invitations.data.map((inv) => (
@@ -193,10 +202,10 @@ export default function PostAuthPage() {
                 className="rounded-control border border-border bg-surface p-4"
               >
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">Rôle</span>
+                  <span className="text-sm font-semibold">Rôle</span>
                   <Badge tone="primary">{inv.role}</Badge>
                 </div>
-                <p className="mb-3 text-xs text-muted-foreground">
+                <p className="mb-3 text-xs leading-5 text-muted-foreground">
                   Invitation envoyée à {inv.email}. En acceptant, vous rejoignez
                   l’organisation.
                 </p>
@@ -214,7 +223,7 @@ export default function PostAuthPage() {
             ) : null}
             <Link
               href="/onboarding"
-              className="block text-center text-sm font-medium text-primary hover:underline"
+              className="block text-center text-sm font-semibold text-primary hover:underline"
             >
               Créer ma propre entreprise à la place
             </Link>
@@ -224,8 +233,12 @@ export default function PostAuthPage() {
         <Card
           title="Créez votre entreprise"
           subtitle="Vous n’avez pas encore d’organisation. Passons à la création."
+          icon={Building2}
         >
-          <Button onClick={() => router.replace("/onboarding")} className="w-full">
+          <Button
+            onClick={() => router.replace("/onboarding")}
+            className="w-full"
+          >
             Commencer l’installation
           </Button>
         </Card>
