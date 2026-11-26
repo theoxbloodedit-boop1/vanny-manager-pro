@@ -12,7 +12,7 @@
  * in-app path is the AUTHENTICATED SESSION (same trust model as every other
  * in-app mutation; the CLI token path is unchanged).
  */
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import * as z from "zod";
 import { getAuth } from "../auth";
 import { getAuthDb } from "../auth/db";
@@ -151,10 +151,25 @@ export interface PendingPhoneUser {
   createdAt: Date;
 }
 
+/**
+ * ADR-0017 — an EMAIL account (no WhatsApp number) that is neither verified
+ * nor manually approved. These are exactly the accounts that appear after an
+ * invitation: the invitee signs up with the invited email, then cannot pass
+ * the verification gate until an operator approves them (ADR-0014 audited
+ * flow) — the in-app alternative to the email-verification link.
+ */
+export interface PendingEmailUser {
+  userId: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+}
+
 export interface RecentApproval {
   userId: string;
   name: string;
-  phone: string;
+  /** null for email-only (invited) accounts — ADR-0017. */
+  phone: string | null;
   email: string;
   action: string;
   reason: string;
@@ -188,12 +203,14 @@ export async function requireOperator(
 }
 
 /**
- * Pending phone sign-ups (phone set, not approved yet) + the most recent
- * phone-account approvals, each correlated with its latest audit row.
+ * Pending phone sign-ups (phone set, not approved yet) + pending email
+ * accounts (ADR-0017: invited users awaiting manual approval) + the most
+ * recent phone-account approvals, each correlated with its latest audit row.
  * Platform tables only — never tenant data. Operator-gated.
  */
 export async function listPhoneApprovals(headers: Headers): Promise<{
   pending: PendingPhoneUser[];
+  pendingEmail: PendingEmailUser[];
   recent: RecentApproval[];
 }> {
   await requireOperator(headers);
@@ -222,10 +239,39 @@ export async function listPhoneApprovals(headers: Headers): Promise<{
       createdAt: r.createdAt,
     }));
 
+  // ADR-0017: email accounts (no phone) that are neither verified nor
+  // approved — invited users who cannot receive the verification email
+  // (e.g. no mailbox / Resend not configured) wait here for manual approval.
+  const pendingEmailRows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(
+      and(
+        isNull(users.phone),
+        eq(users.emailVerified, false),
+        eq(users.manuallyApproved, false),
+      ),
+    )
+    .orderBy(desc(users.createdAt))
+    .limit(100);
+
+  const pendingEmail: PendingEmailUser[] = pendingEmailRows.map((r) => ({
+    userId: r.id,
+    name: r.name,
+    email: r.email,
+    createdAt: r.createdAt,
+  }));
+
+  // ADR-0017: recently approved accounts of BOTH kinds (phone + email).
   const approvedRows = await db
     .select({ id: users.id, name: users.name, phone: users.phone, email: users.email })
     .from(users)
-    .where(and(isNotNull(users.phone), eq(users.manuallyApproved, true)))
+    .where(eq(users.manuallyApproved, true))
     .orderBy(desc(users.updatedAt))
     .limit(20);
 
@@ -253,7 +299,7 @@ export async function listPhoneApprovals(headers: Headers): Promise<{
         recent.push({
           userId: u.id,
           name: u.name,
-          phone: u.phone as string,
+          phone: u.phone,
           email: u.email,
           action: latest.action,
           reason: latest.reason,
@@ -264,14 +310,23 @@ export async function listPhoneApprovals(headers: Headers): Promise<{
     }
   }
 
-  return { pending, recent };
+  return { pending, pendingEmail, recent };
 }
 
-const approvalBody = z.object({
-  phone: z.string().min(5).max(32),
-  action: z.enum(["approve", "revoke"]),
-  reason: z.string().min(4).max(500),
-});
+/**
+ * ADR-0017: the operator targets EITHER a WhatsApp number (phone account) OR
+ * an email address (email/invited account) — exactly one of the two.
+ */
+const approvalBody = z
+  .object({
+    phone: z.string().min(5).max(32).optional(),
+    email: z.string().min(3).max(320).email().optional(),
+    action: z.enum(["approve", "revoke"]),
+    reason: z.string().min(4).max(500),
+  })
+  .refine((b) => (b.phone ? 1 : 0) + (b.email ? 1 : 0) === 1, {
+    message: "Fournir soit un numéro WhatsApp, soit une adresse email.",
+  });
 
 /**
  * Approve / revoke a phone sign-up. Identity = the AUTHENTICATED session,
@@ -290,23 +345,43 @@ export async function operatorApplyApproval(
   const body = approvalBody.parse(raw);
   const { operatorId } = await requireOperator(headers);
 
-  const e164 = normalizeOrThrow(body.phone);
-  const virtualEmail = phoneToVirtualEmail(e164);
-
   const db = getAuthDb();
-  const target = await db
-    .select({ id: users.id, email: users.email, phone: users.phone })
-    .from(users)
-    .where(eq(users.email, virtualEmail))
-    .limit(1);
-  if (target.length === 0 || target[0]!.phone === null) {
-    throw new ApiError(404, "NOT_FOUND", "Aucun compte WhatsApp avec ce numéro.");
+  let target: { id: string; email: string; phone: string | null };
+  if (body.email) {
+    // ADR-0017: email/invited account — matched directly on its email.
+    const rows = await db
+      .select({ id: users.id, email: users.email, phone: users.phone })
+      .from(users)
+      .where(eq(users.email, body.email))
+      .limit(1);
+    if (rows.length === 0) {
+      throw new ApiError(404, "NOT_FOUND", "Aucun compte avec cet email.");
+    }
+    target = rows[0]!;
+  } else {
+    // .refine guarantees exactly one of phone/email, but TS can't see through
+    // it — narrow explicitly.
+    const phone = body.phone;
+    if (!phone) {
+      throw new ApiError(400, "BAD_REQUEST", "Numéro WhatsApp requis.");
+    }
+    const e164 = normalizeOrThrow(phone);
+    const virtualEmail = phoneToVirtualEmail(e164);
+    const rows = await db
+      .select({ id: users.id, email: users.email, phone: users.phone })
+      .from(users)
+      .where(eq(users.email, virtualEmail))
+      .limit(1);
+    if (rows.length === 0 || rows[0]!.phone === null) {
+      throw new ApiError(404, "NOT_FOUND", "Aucun compte WhatsApp avec ce numéro.");
+    }
+    target = rows[0]!;
   }
 
   try {
     const result = await applyManualApproval({
       operatorId,
-      userEmail: target[0]!.email,
+      userEmail: target.email,
       action: body.action,
       reason: body.reason,
     });

@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { MessageCircle, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Mail, MessageCircle, ShieldCheck } from "lucide-react";
 import {
   signInEmail,
   signInPhone,
@@ -21,6 +21,10 @@ import { ApiErrorText, Button, Field, Input, Logo, Segmented } from "@/component
  *
  * After a successful call we go to /post-auth, which orchestrates:
  * verification / approval → invitation acceptance → onboarding → admin.
+ *
+ * ADR-0017: an invitation link (`/auth?email=…`, shared over WhatsApp)
+ * pre-fills the invitee's email and starts on the sign-up mode — the email
+ * IS the invitation identity (no token, nothing extra leaked).
  */
 export default function AuthPage() {
   const router = useRouter();
@@ -32,6 +36,22 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [inviteEmail, setInviteEmail] = useState<string>();
+
+  // ADR-0017: honor a shared invitation link (client-side only, no API).
+  // Reading window.location on mount and seeding state from it is the
+  // canonical "sync from an external system" effect — the rule it trips is
+  // about effects that re-run / cascade, not one-shot mount hydration.
+  useEffect(() => {
+    const email = new URLSearchParams(window.location.search).get("email");
+    if (email && email.includes("@")) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot mount hydration from the URL (see comment above)
+      setInviteEmail(email);
+      setMode("signup");
+      setSignupVia("email");
+      setIdentifier(email);
+    }
+  }, []);
 
   const phoneMode = mode === "signup" && signupVia === "phone";
 
@@ -68,6 +88,22 @@ export default function AuthPage() {
       </div>
 
       <div className="rounded-card border border-border bg-surface-raised p-5 shadow-card sm:p-6">
+        {inviteEmail && (
+          <div className="mb-4 flex items-start gap-2 rounded-control border border-primary-soft bg-primary-soft/40 p-3 text-sm">
+            <Mail className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            <p className="leading-5 text-muted-foreground">
+              <span className="font-semibold text-foreground">
+                Vous avez été invité·e.
+              </span>{" "}
+              Créez votre compte (ou connectez-vous) avec l’adresse
+              pré-remplie ci-dessous :{" "}
+              <span className="break-all font-semibold text-foreground">
+                {inviteEmail}
+              </span>
+              , puis acceptez l’invitation.
+            </p>
+          </div>
+        )}
         <div className="mb-5">
           <Segmented
             className="grid-cols-2"

@@ -1,6 +1,6 @@
 # VANNY MANAGER PRO
 
-African multi-business management SaaS — boutiques, bars, restaurants, hair salons and pharmacies.
+African multi-business management SaaS — boutiques, supérettes, bars, restaurants and hair salons (pharmacy reserved for later: lots, expiry dates, prescriptions, regulatory traceability).
 
 > **Status: Phase 1a — tenancy foundation.** The multi-tenant schema is live with
 > row-level security, proven by a 13-test suite on a real PostgreSQL server

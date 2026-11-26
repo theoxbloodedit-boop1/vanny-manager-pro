@@ -8,6 +8,7 @@ import {
   Inbox,
   KeyRound,
   LogOut,
+  Mail,
   MessageCircle,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
@@ -36,16 +37,24 @@ interface PendingUser {
   phone: string;
   createdAt: string;
 }
+interface PendingEmailUser {
+  userId: string;
+  name: string;
+  email: string;
+  createdAt: string;
+}
 interface RecentApproval {
   userId: string;
   name: string;
-  phone: string;
+  phone: string | null;
+  email: string;
   action: string;
   reason: string;
   at: string;
 }
 interface Approvals {
   pending: PendingUser[];
+  pendingEmail: PendingEmailUser[];
   recent: RecentApproval[];
 }
 
@@ -75,11 +84,15 @@ function fmtDate(iso: string): string {
 const DEFAULT_APPROVE_REASON = "Identité confirmée par WhatsApp";
 const DEFAULT_REVOKE_REASON = "Annulation — erreur de validation";
 
+/** Identity of the account being acted on: a WhatsApp number or an email. */
+type Target = { phone?: string; email?: string };
+
 export default function OperatorPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const [confirming, setConfirming] = useState<{
-    phone: string;
+    target: Target;
+    key: string; // stable row key: "phone:<n>" or "email:<e>" or "recent:<id>"
     action: "approve" | "revoke";
   } | null>(null);
   const [reason, setReason] = useState("");
@@ -124,14 +137,14 @@ export default function OperatorPage() {
     );
   }
 
-  async function runAction(phone: string, action: "approve" | "revoke") {
+  async function runAction(target: Target, action: "approve" | "revoke") {
     setBusy(true);
     setError(undefined);
     try {
       const res = await fetch("/api/operator/approvals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, action, reason }),
+        body: JSON.stringify({ ...target, action, reason }),
       });
       const body = (await res.json()) as { message?: string };
       if (!res.ok) throw new Error(body.message || "Action impossible");
@@ -145,7 +158,9 @@ export default function OperatorPage() {
   }
 
   const pending = data?.pending ?? [];
+  const pendingEmail = data?.pendingEmail ?? [];
   const recent = data?.recent ?? [];
+  const totalPending = pending.length + pendingEmail.length;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -180,13 +195,13 @@ export default function OperatorPage() {
       <main className="mx-auto max-w-3xl space-y-5 p-4 sm:p-6">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge tone="primary">Compte opérateur</Badge>
-          <Badge tone={pending.length > 0 ? "warning" : "success"}>
-            {pending.length} en attente
+          <Badge tone={totalPending > 0 ? "warning" : "success"}>
+            {totalPending} en attente
           </Badge>
         </div>
 
         <Card
-          title="En attente de validation"
+          title="En attente de validation — WhatsApp"
           subtitle="Le client s’est inscrit avec son numéro WhatsApp. Confirmez son identité (appel WhatsApp), puis validez."
           icon={MessageCircle}
         >
@@ -207,13 +222,17 @@ export default function OperatorPage() {
                         {u.phone} · {fmtDate(u.createdAt)}
                       </p>
                     </div>
-                    {confirming?.phone === u.phone ? null : (
+                    {confirming?.key === `phone:${u.phone}` ? null : (
                       <Button
                         className="min-h-9"
                         onClick={() => {
                           setReason(DEFAULT_APPROVE_REASON);
                           setError(undefined);
-                          setConfirming({ phone: u.phone, action: "approve" });
+                          setConfirming({
+                            target: { phone: u.phone },
+                            key: `phone:${u.phone}`,
+                            action: "approve",
+                          });
                         }}
                       >
                         <CheckCircle2 className="size-4" aria-hidden />
@@ -222,7 +241,7 @@ export default function OperatorPage() {
                     )}
                   </div>
 
-                  {confirming?.phone === u.phone && (
+                  {confirming?.key === `phone:${u.phone}` && (
                     <div className="space-y-2 rounded-control bg-surface-inset p-3">
                       <Field
                         label="Motif (consigné dans l’audit)"
@@ -242,11 +261,98 @@ export default function OperatorPage() {
                           loading={busy}
                           disabled={reason.trim().length < 4}
                           onClick={() =>
-                            runAction(u.phone, confirming.action)
+                            runAction({ phone: u.phone }, confirming.action)
                           }
                           className="flex-1"
                         >
                           Confirmer la {confirming.action === "approve" ? "validation" : "révocation"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setConfirming(null)}
+                        >
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card
+          title="En attente de validation — email"
+          subtitle="Personne invitée (lien WhatsApp ou email) qui a créé son compte avec l’email invité. Confirmez son identité, puis validez pour qu’elle puisse accepter l’invitation."
+          icon={Mail}
+        >
+          {pendingEmail.length === 0 ? (
+            <EmptyState
+              icon={Inbox}
+              title="Aucune attente"
+              hint="Les comptes email invités non vérifiés apparaîtront ici."
+            />
+          ) : (
+            <ul className="divide-y divide-border">
+              {pendingEmail.map((u) => (
+                <li key={u.userId} className="space-y-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{u.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {u.email} · {fmtDate(u.createdAt)}
+                      </p>
+                    </div>
+                    {confirming?.key === `email:${u.email}` ? null : (
+                      <Button
+                        className="min-h-9"
+                        onClick={() => {
+                          setReason(
+                            "Identité confirmée — invité d’organisation",
+                          );
+                          setError(undefined);
+                          setConfirming({
+                            target: { email: u.email },
+                            key: `email:${u.email}`,
+                            action: "approve",
+                          });
+                        }}
+                      >
+                        <CheckCircle2 className="size-4" aria-hidden />
+                        Valider
+                      </Button>
+                    )}
+                  </div>
+
+                  {confirming?.key === `email:${u.email}` && (
+                    <div className="space-y-2 rounded-control bg-surface-inset p-3">
+                      <Field
+                        label="Motif (consigné dans l’audit)"
+                        hint="Modifiable — obligatoire pour la traçabilité."
+                      >
+                        <Input
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          minLength={4}
+                        />
+                      </Field>
+                      {error ? (
+                        <p className="text-sm text-accent">{error}</p>
+                      ) : null}
+                      <div className="flex gap-2">
+                        <Button
+                          loading={busy}
+                          disabled={reason.trim().length < 4}
+                          onClick={() =>
+                            runAction({ email: u.email }, confirming.action)
+                          }
+                          className="flex-1"
+                        >
+                          Confirmer la{" "}
+                          {confirming.action === "approve"
+                            ? "validation"
+                            : "révocation"}
                         </Button>
                         <Button
                           variant="outline"
@@ -283,7 +389,7 @@ export default function OperatorPage() {
                     <p className="truncate text-sm font-semibold">
                       {a.name}{" "}
                       <span className="font-normal tabular-nums text-muted-foreground">
-                        · {a.phone}
+                        · {a.phone ?? a.email}
                       </span>
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
@@ -304,7 +410,11 @@ export default function OperatorPage() {
                       onClick={() => {
                         setReason(DEFAULT_REVOKE_REASON);
                         setError(undefined);
-                        setConfirming({ phone: a.phone, action: "revoke" });
+                        setConfirming({
+                          target: a.phone ? { phone: a.phone } : { email: a.email },
+                          key: `recent:${a.userId}`,
+                          action: "revoke",
+                        });
                       }}
                     >
                       Révoquer
@@ -315,8 +425,7 @@ export default function OperatorPage() {
             </ul>
           )}
           {confirming &&
-          recent.some((r) => r.phone === confirming.phone) &&
-          !pending.some((p) => p.phone === confirming.phone) ? (
+          recent.some((r) => `recent:${r.userId}` === confirming.key) ? (
             <div className="mt-3 space-y-2 rounded-control bg-surface-inset p-3">
               <Field
                 label="Motif de la révocation (consigné dans l’audit)"
@@ -335,7 +444,7 @@ export default function OperatorPage() {
                   loading={busy}
                   disabled={reason.trim().length < 4}
                   onClick={() =>
-                    confirming && runAction(confirming.phone, "revoke")
+                    confirming && runAction(confirming.target, "revoke")
                   }
                   className="flex-1"
                 >
