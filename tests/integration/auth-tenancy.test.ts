@@ -342,6 +342,7 @@ describe("onboarding", () => {
 
   it("cross-tenant: a second organization is completely invisible to org A staff", async () => {
     const carol = await signup("Carol Ndaye", "carol@example.cd");
+    await verifyEmail("carol@example.cd"); // ADR-0016: server-side onboarding gate
     const orgB = await runOnboarding(carol.headers, {
       name: "Bar Oméga",
       slug: "bar-omega",

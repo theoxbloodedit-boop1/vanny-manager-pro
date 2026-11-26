@@ -1,9 +1,11 @@
 import { eq } from "drizzle-orm";
+import { getAuthDb } from "../auth/db";
 import { getAuth } from "../auth";
 import { withTenantDb } from "../db/tenant";
-import { members } from "../db/schema/auth";
+import { members, users } from "../db/schema/auth";
 import { ApiError } from "./errors";
 import { takeCapturedMails } from "./email";
+import { isVirtualEmail } from "./phone";
 import { parseRoleList } from "./rbac/permissions";
 
 /**
@@ -20,6 +22,10 @@ export interface Me {
     name: string;
     email: string;
     emailVerified: boolean;
+    /** ADR-0016: E.164 phone number for phone accounts, null otherwise. */
+    phone: string | null;
+    /** ADR-0014/0016: operator-approved (distinct from emailVerified). */
+    manuallyApproved: boolean;
   };
   organization?: {
     id: string;
@@ -37,6 +43,14 @@ export async function getMe(headers: Headers): Promise<Me> {
   const session = await auth.api.getSession({ headers });
   if (!session?.user) return { authenticated: false };
 
+  // ADR-0016: phone + manual-approval live on the platform user row (the
+  // session only carries name/email/emailVerified). One small read.
+  const flagRows = await getAuthDb()
+    .select({ phone: users.phone, manuallyApproved: users.manuallyApproved })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
   const me: Me = {
     authenticated: true,
     user: {
@@ -44,6 +58,8 @@ export async function getMe(headers: Headers): Promise<Me> {
       name: session.user.name,
       email: session.user.email,
       emailVerified: session.user.emailVerified,
+      phone: flagRows[0]?.phone ?? null,
+      manuallyApproved: flagRows[0]?.manuallyApproved ?? false,
     },
     organization: null,
     role: null,
@@ -114,6 +130,15 @@ export async function devVerificationLink(headers: Headers): Promise<{
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
   if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
+  if (isVirtualEmail(session.user.email)) {
+    // ADR-0016: phone accounts have no mailbox — no verification link can
+    // ever be delivered. They are validated by the operator, not by mail.
+    throw new ApiError(
+      409,
+      "PHONE_ACCOUNT",
+      "Les comptes WhatsApp sont validés par l'équipe, pas par email.",
+    );
+  }
   if (session.user.emailVerified) {
     throw new ApiError(409, "ALREADY_VERIFIED", "Email already verified");
   }

@@ -23,24 +23,36 @@ import { tenantIsolationPolicy } from "./rls";
  * Ids are `text`: Better Auth generates them (cuid-style) unless a hook
  * supplies one (we supply UUIDv7 for organizations — see src/auth/index.ts).
  */
-export const users = pgTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").notNull().default(false),
-  /**
-   * ADR-0014: distinct from `emailVerified`. A manual approval means "an
-   * operator approved this user to join" — it NEVER means the email address
-   * was verified, and it is never written by the email-verification flow.
-   * Set ONLY by the audited manual-approval script (single transaction with
-   * `manual_approvals`). Grants no organization access by itself; it only lets
-   * the user satisfy the invitation-acceptance verification gate.
-   */
-  manuallyApproved: boolean("manually_approved").notNull().default(false),
-  image: text("image"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
-});
+export const users = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    /**
+     * ADR-0016: E.164 phone number for phone (WhatsApp) sign-ups, e.g.
+     * "+243971234567". NULL for email accounts. The unique index makes the
+     * phone the single source of truth for account deduplication (the
+     * deterministic virtual email in `email` is derived from it).
+     */
+    phone: text("phone"),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    /**
+     * ADR-0014: distinct from `emailVerified`. A manual approval means "an
+     * operator approved this user to join" — it NEVER means the email address
+     * was verified, and it is never written by the email-verification flow.
+     * Set ONLY by the audited manual-approval flow (single transaction with
+     * `manual_approvals`). Grants no organization access by itself; it lets
+     * the user satisfy the verification gates (invitation acceptance,
+     * onboarding). For phone accounts (ADR-0016) it is THE trust anchor.
+     */
+    manuallyApproved: boolean("manually_approved").notNull().default(false),
+    image: text("image"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [uniqueIndex("user_phone_uq").on(t.phone)],
+);
 
 export const sessions = pgTable(
   "session",
@@ -159,11 +171,13 @@ export const invitations = pgTable(
  *
  * Append-only ledger of manual approval/revocation operations. Enforced
  * append-only by a DB trigger (see migration) so no UPDATE/DELETE is possible
- * for any role. Written ONLY by the audited manual-approval script, in the same
- * transaction as the `user.manually_approved` update.
+ * for any role. Written ONLY by the audited manual-approval flow (CLI script
+ * with a verified operator token, or the in-app operator dashboard whose
+ * identity is the authenticated operator session — ADR-0016), always in the
+ * same transaction as the `user.manually_approved` update.
  *
- * `operatorId` is the REAL operator identifier derived from a VERIFIED operator
- * token (an authenticated execution context) — never a freely-typed argument.
+ * `operatorId` is the REAL operator identifier (token `sub`, or session user
+ * id) from an authenticated execution context — never a freely-typed argument.
  */
 export const manualApprovals = pgTable(
   "manual_approvals",

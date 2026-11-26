@@ -89,6 +89,30 @@ export function handleApi(
   };
 }
 
+/**
+ * Like `handleApi`, but the service may return a full `Response` (e.g. a
+ * Better Auth session response whose Set-Cookie must reach the browser
+ * verbatim — ADR-0016 phone sign-up/sign-in). Errors map identically.
+ */
+export function handleAuthApi(
+  fn: (req: Request) => Promise<unknown>,
+): (req: Request) => Promise<Response> {
+  return async (req) => {
+    try {
+      const result = await fn(req);
+      if (result instanceof Response) return result;
+      return NextResponse.json(result ?? { ok: true });
+    } catch (e) {
+      const err = toHttpError(e);
+      if (err.status >= 500) console.error("[api] unhandled:", e);
+      return NextResponse.json(
+        { error: err.error, message: err.message },
+        { status: err.status },
+      );
+    }
+  };
+}
+
 /** Read an optional JSON body; malformed JSON → null (let the schema reject). */
 export async function readJson(req: Request): Promise<unknown> {
   try {

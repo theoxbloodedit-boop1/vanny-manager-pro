@@ -1029,9 +1029,13 @@ describe("ADR-0014 — permission isolation & approval-revocation effect", () =>
     expect(s?.user?.id).toBe(eve.user.id);
   });
 
-  it("an unverified OWNER (onboarded, not approved) is NOT blocked (onboarding carve-out)", async () => {
+  it("a VERIFIED but unapproved OWNER is NOT blocked (owner is exempt from manual approval)", async () => {
     const ou = await signup("Owner Unverified", "owner-unverified@example.cd");
-    // Do NOT verify, do NOT approve. Onboarding is not verification-gated.
+    // ADR-0016: onboarding is now server-gated on (emailVerified OR
+    // manuallyApproved). We verify the email (the normal path) but do NOT
+    // manually approve — the point is that the OWNER role needs no approval
+    // for sensitive org operations.
+    await verifyEmail("owner-unverified@example.cd");
     const orgU = await runOnboarding(ou.headers, {
       name: "Bar Unverified",
       slug: "bar-unverified",
