@@ -56,3 +56,4 @@ compat-check/
 
 # typescript incremental build info
 *.tsbuildinfo
+.neon

@@ -2,7 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq, and } from "drizzle-orm";
 import { Pool } from "pg";
 import { APP_URL, startPostgres, stopPostgres, seed } from "./pg-harness";
-import { withTenantDb, closeTenantPool } from "../../src/db/tenant";
+import {
+  withTenantDb,
+  closeTenantPool,
+  getTenantPool,
+} from "../../src/db/tenant";
 import { products, productPrices, cashSessions } from "../../src/db/schema";
 
 /**
@@ -65,6 +69,9 @@ beforeAll(async () => {
   }
   // `withTenantDb` builds its pool from DATABASE_URL on first use.
   process.env.DATABASE_URL = APP_URL;
+  // Swallow 57P01 (server-shutdown) on idle tenant-pool clients during the
+  // embedded-PG teardown — a teardown artifact, not a test failure.
+  getTenantPool().on("error", () => {});
 }, 120_000);
 
 afterAll(async () => {
@@ -143,7 +150,7 @@ describe("RLS — write isolation", () => {
     const client = await raw.connect();
     try {
       await client.query("BEGIN");
-      await client.query("SELECT set_config('app.org_id', $1, false)", [ORG_A]);
+      await client.query("SELECT set_config('app.org_id', $1, true)", [ORG_A]);
       const res = await client.query(`DELETE FROM products WHERE id = $1`, [PROD_B]);
       expect(res.rowCount).toBe(0);
       await client.query("ROLLBACK");

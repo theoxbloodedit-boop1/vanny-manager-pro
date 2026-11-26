@@ -6,6 +6,7 @@ import { branches, branchAccess } from "../db/schema/org";
 import { members } from "../db/schema/auth";
 import { uuidv7 } from "../lib/uuid";
 import { ApiError } from "./errors";
+import { isManuallyApproved } from "./manual-approval";
 import { authorize } from "./rbac/authorize";
 import { ROLES, type Role } from "./rbac/permissions";
 
@@ -256,8 +257,22 @@ export async function acceptInvitation(headers: Headers, raw: unknown) {
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
   if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
-  // Better Auth verifies the invitation is pending, unexpired, and that the
-  // recipient's email matches this session — cross-tenant acceptance is
-  // impossible by construction.
+  // ADR-0014 verification gate. The plugin's own email check on acceptance is
+  // disabled (requireEmailVerificationOnInvitation: false), so we enforce it
+  // here: a user may accept if their email is VERIFIED or they are MANUALLY
+  // APPROVED (audited operator action). Approval NEVER implies emailVerified.
+  // The plugin STILL enforces the invitation token (valid/expiring/single-use),
+  // recipient-email match (cross-tenant acceptance is impossible by
+  // construction), and permission control — the link's security is unchanged.
+  if (!session.user.emailVerified) {
+    const approved = await isManuallyApproved(session.user.id);
+    if (!approved) {
+      throw new ApiError(
+        403,
+        "VERIFICATION_REQUIRED",
+        "This account must be verified or manually approved before accepting an invitation.",
+      );
+    }
+  }
   return auth.api.acceptInvitation({ body: { invitationId: body.invitationId }, headers });
 }
