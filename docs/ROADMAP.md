@@ -98,7 +98,10 @@ pipeline.
 
 ## Phase 2 — Catalog and inventory
 
-**Not yet authorized.**
+**Authorized** (propriétaire, 2026-11-26 — « GO Phases 2-5 »). Phases 3/4/5 are
+pre-authorized in the same decision; each still starts only when the previous
+gate passes (sequential gates are a roadmap invariant, not an approval
+question).
 
 | # | Task |
 |---|---|
