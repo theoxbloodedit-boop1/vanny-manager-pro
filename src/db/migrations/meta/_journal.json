@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1795528672452,
+      "tag": "0000_whole_lady_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795613510703,
+      "tag": "0001_closed_lord_tyger",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795615881241,
+      "tag": "0002_real_karnak",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795619581209,
+      "tag": "0003_striped_klaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795687226824,
+      "tag": "0005_phone_identity",
+      "breakpoints": true
+    }
+  ]
+}
