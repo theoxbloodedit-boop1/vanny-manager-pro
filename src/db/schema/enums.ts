@@ -43,3 +43,59 @@ export const cashSessionStatusEnum = pgEnum("cash_session_status", [
   "open",
   "closed",
 ]);
+
+/* ------------------------------------------------------------------ *
+ * PHASE 6.2 — PLATFORM ADMIN + BILLING (ADR-0019)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Subscription plan tiers (SaaS). `free` is the default a new org gets on
+ * creation; `pro` / `enterprise` are the paid tiers the platform admin
+ * assigns. Plans are a STATIC catalog (see src/server/platform.ts
+ * PLATFORM_PLANS) — a plan code here is the source of truth, validated
+ * app-side and fail-closed (unknown plan → 400, never a 500).
+ */
+export const subscriptionPlanEnum = pgEnum("subscription_plan", [
+  "free",
+  "pro",
+  "enterprise",
+]);
+
+/** Subscription lifecycle status (SaaS billing). */
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "trialing",
+  "active",
+  "past_due",
+  "canceled",
+  "suspended",
+]);
+
+/** Billing cadence. */
+export const billingIntervalEnum = pgEnum("billing_interval", [
+  "monthly",
+  "yearly",
+]);
+
+/**
+ * Billing-event actions (append-only ledger). Every billing mutation the
+ * platform admin performs is recorded here, atomically with the change.
+ */
+export const billingEventActionEnum = pgEnum("billing_event_action", [
+  "created",
+  "plan_changed",
+  "status_changed",
+  "seats_changed",
+  "amount_changed",
+  "period_renewed",
+]);
+
+/**
+ * Platform-access audit actions (append-only ledger). The ROADMAP Phase-6.2
+ * gate: a platform admin CANNOT read tenant data without an audit entry.
+ * `org_list` = the tenant roster was read; `org_detail` = a single tenant's
+ * business data was drilled into.
+ */
+export const platformAccessActionEnum = pgEnum("platform_access_action", [
+  "org_list",
+  "org_detail",
+]);
