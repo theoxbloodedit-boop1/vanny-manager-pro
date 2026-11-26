@@ -18,6 +18,20 @@ export const businessSectorEnum = pgEnum("business_sector", [
 /** `service` items never touch stock. */
 export const productKindEnum = pgEnum("product_kind", ["product", "service"]);
 
+/**
+ * ADR-0004/0018 — stock movement types. The enum is frozen NOW (sale/return
+ * included) so Phase 3 never has to migrate an append-only ledger. `sale` and
+ * `return` are written by the POS (Phase 3) only.
+ */
+export const stockMovementTypeEnum = pgEnum("stock_movement_type", [
+  "purchase",
+  "adjustment",
+  "transfer_in",
+  "transfer_out",
+  "sale",
+  "return",
+]);
+
 export const saleStatusEnum = pgEnum("sale_status", [
   "completed",
   "voided",
