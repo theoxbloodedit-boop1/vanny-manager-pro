@@ -56,6 +56,7 @@ import {
   AdminSidebar,
   type AdminSection,
 } from "@/components/admin/sidebar";
+import { AnimatePresence, motion } from "framer-motion";
 
 /**
  * ADR-0020 — ADMIN DASHBOARD (redesign).
@@ -306,6 +307,16 @@ export default function AdminPage() {
             }}
           />
 
+          {/* Transition fluide entre les sections (style SaaS US). */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={section}
+              className="space-y-5"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            >
           {/* ---- OVERVIEW ---- */}
           {section === "overview" && (
             <div className="space-y-5">
@@ -763,6 +774,8 @@ export default function AdminPage() {
           {section === "vault" && (
             <VaultPanel permissions={me.data.permissions ?? []} />
           )}
+          </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

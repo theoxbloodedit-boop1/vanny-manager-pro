@@ -16,17 +16,55 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  ),
   title: {
     default: "VANNY MANAGER PRO — Gérez votre activité, proprement",
     template: "%s · VANNY MANAGER PRO",
   },
   description:
     "Ventes, stock, caisses et équipes dans un seul espace. Multi-succursales, multi-rôles, USD et CDF sans les confondre. Conçu pour les entrepreneurs africains.",
+  keywords: [
+    "gestion de commerce",
+    "SaaS gestion",
+    "stock",
+    "catalogue",
+    "équipes",
+    "multi-succursales",
+    "USD CDF",
+    "gestion d'activité RDC",
+  ],
   manifest: "/manifest.webmanifest",
+  authors: [{ name: "VANNY" }],
+  creator: "VANNY",
   icons: {
     icon: "/icons/icon-192.png",
     apple: "/icons/icon-192.png",
+  },
+  openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+    siteName: "VANNY MANAGER PRO",
+    title: "VANNY MANAGER PRO — Gérez votre activité, proprement",
+    description:
+      "Le SaaS de gestion pour vos commerces : catalogue, stock, équipes et succursales dans un seul espace. Conçu pour la RDC.",
+    images: [
+      {
+        url: "/icons/icon-192.png",
+        width: 192,
+        height: 192,
+        alt: "VANNY MANAGER PRO",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "VANNY MANAGER PRO — Gérez votre activité, proprement",
+    description:
+      "Catalogue, stock, équipes et succursales dans un seul espace. Conçu pour les entrepreneurs africains.",
+    images: ["/icons/icon-192.png"],
   },
 };
 

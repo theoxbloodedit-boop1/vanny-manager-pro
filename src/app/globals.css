@@ -109,3 +109,65 @@ input[type="checkbox"] {
   height: 1rem;
   accent-color: var(--color-primary);
 }
+
+/* ------------------------------------------------------------------ */
+/* ADR-0026 — Animations (style SaaS US)                              */
+/* ------------------------------------------------------------------ */
+
+/* Dégradé aurora animé derrière le hero — ambiance premium, léger. */
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(-6%, -4%, 0) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate3d(6%, 4%, 0) scale(1.15);
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate3d(-6%, -4%, 0) scale(1);
+    opacity: 0.5;
+  }
+}
+
+.aurora {
+  position: absolute;
+  inset: -30% -10% auto -10%;
+  height: 140%;
+  background:
+    radial-gradient(40% 50% at 20% 30%, var(--color-primary-soft) 0%, transparent 70%),
+    radial-gradient(45% 55% at 80% 20%, var(--color-primary-faint) 0%, transparent 70%);
+  filter: blur(28px);
+  pointer-events: none;
+  animation: aurora-drift 16s ease-in-out infinite;
+  z-index: 0;
+}
+
+/* Léger flux subtil pour les gradients d'accent. */
+@keyframes gradient-pan {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-pan 8s ease infinite;
+}
+
+/* Apparition d'entrée légère pour les panneaux (accessibilité réduite). */
+@media (prefers-reduced-motion: reduce) {
+  .aurora,
+  .animate-gradient {
+    animation: none !important;
+  }
+}
+
+/* Rend le contenu principal au-dessus de l'aurora. */
+.relative-z {
+  position: relative;
+  z-index: 1;
+}

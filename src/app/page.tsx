@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   ArrowRight,
@@ -14,6 +16,8 @@ import {
   Wine,
 } from "lucide-react";
 import { Logo, LogoMark } from "@/components/ui";
+import { Reveal, StaggerGroup, CARD_HOVER } from "@/components/motion";
+import { motion } from "framer-motion";
 
 export const dynamic = "force-static";
 
@@ -239,8 +243,10 @@ export default function HomePage() {
 
       <main className="mx-auto max-w-6xl px-4 sm:px-6">
         {/* Hero — la réponse en 10 secondes */}
-        <section className="grid items-center gap-10 py-14 md:grid-cols-2 md:gap-12 md:py-20">
-          <div>
+        <section className="relative overflow-hidden grid items-center gap-10 py-14 md:grid-cols-2 md:gap-12 md:py-20">
+          <div className="aurora" aria-hidden />
+          <div className="relative-z grid w-full items-center gap-10 md:grid-cols-2 md:gap-12">
+          <Reveal>
             <span className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted-foreground">
               <ShieldCheck className="size-3.5 text-primary" aria-hidden />
               Le SaaS de gestion pour vos commerces — conçu pour la RDC
@@ -258,14 +264,14 @@ export default function HomePage() {
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <Link
                 href="/auth"
-                className="inline-flex min-h-12 items-center gap-2 rounded-control bg-primary px-6 text-sm font-bold text-white shadow-pop transition-colors hover:bg-primary-hover"
+                className="inline-flex min-h-12 items-center gap-2 rounded-control bg-primary px-6 text-sm font-bold text-white shadow-pop transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-float"
               >
                 Commencer maintenant
-                <ArrowRight className="size-4" aria-hidden />
+                <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
               </Link>
               <Link
                 href="/auth"
-                className="inline-flex min-h-12 items-center rounded-control border border-border-strong bg-surface-raised px-6 text-sm font-bold text-foreground hover:bg-surface"
+                className="inline-flex min-h-12 items-center rounded-control border border-border-strong bg-surface-raised px-6 text-sm font-bold text-foreground transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface"
               >
                 Se connecter
               </Link>
@@ -274,8 +280,11 @@ export default function HomePage() {
               Pharmacie · Bar · Restaurant · Salon · Boutique — chaque activité
               est structurée et optimisée selon son métier.
             </p>
+          </Reveal>
+          <Reveal variant="fade" delay={0.15}>
+            <Mockup />
+          </Reveal>
           </div>
-          <Mockup />
         </section>
 
         {/* Pourquoi nous choisir */}
@@ -290,10 +299,12 @@ export default function HomePage() {
               fonctionner des tables.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <StaggerGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {WHY.map((v) => (
-              <div
+              <motion.div
                 key={v.title}
+                variants={CARD_HOVER}
+                whileHover="hover"
                 className="rounded-card border border-border bg-surface-raised p-5 shadow-card"
               >
                 <span className="flex size-11 items-center justify-center rounded-control bg-primary-soft text-primary">
@@ -301,9 +312,9 @@ export default function HomePage() {
                 </span>
                 <h3 className="mt-4 font-bold tracking-tight">{v.title}</h3>
                 <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{v.text}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </StaggerGroup>
         </section>
 
         {/* Optimisé par activité */}
@@ -317,10 +328,12 @@ export default function HomePage() {
               départ, avec les modules adaptés à ce que vous faites chaque jour.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <StaggerGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {SECTORS.map((s) => (
-              <div
+              <motion.div
                 key={s.id}
+                variants={CARD_HOVER}
+                whileHover="hover"
                 className="rounded-card border border-border bg-surface-raised p-5 shadow-card"
               >
                 <span className="flex size-11 items-center justify-center rounded-control bg-primary-soft text-primary">
@@ -330,9 +343,9 @@ export default function HomePage() {
                 <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
                   {s.promise}
                 </p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </StaggerGroup>
         </section>
 
         {/* Comment ça marche */}
@@ -342,10 +355,12 @@ export default function HomePage() {
               Opérationnel en trois étapes
             </h2>
           </div>
-          <ol className="grid gap-4 md:grid-cols-3">
+          <StaggerGroup className="grid gap-4 md:grid-cols-3">
             {STEPS.map((s, i) => (
-              <li
+              <motion.li
                 key={s.title}
+                variants={CARD_HOVER}
+                whileHover="hover"
                 className="rounded-card border border-border bg-surface-raised p-5 shadow-card"
               >
                 <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-extrabold text-white">
@@ -353,15 +368,15 @@ export default function HomePage() {
                 </span>
                 <h3 className="mt-4 font-bold tracking-tight">{s.title}</h3>
                 <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{s.text}</p>
-              </li>
+              </motion.li>
             ))}
-          </ol>
+          </StaggerGroup>
         </section>
 
         {/* Statut honnête */}
         <section className="border-t border-border bg-surface py-14 md:py-16">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-card border border-border bg-surface-raised p-5 shadow-card">
+            <Reveal className="rounded-card border border-border bg-surface-raised p-5 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-float">
               <div className="mb-4 flex items-center gap-2.5">
                 <span className="flex size-9 items-center justify-center rounded-control bg-success-soft text-success">
                   <KeyRound className="size-4.5" aria-hidden />
@@ -379,8 +394,8 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-            </div>
-            <div className="rounded-card border border-border bg-surface p-5">
+            </Reveal>
+            <Reveal delay={0.1} className="rounded-card border border-border bg-surface p-5 transition-all duration-300 hover:-translate-y-1">
               <div className="mb-4 flex items-center gap-2.5">
                 <span className="flex size-9 items-center justify-center rounded-control bg-surface-inset text-muted-foreground">
                   <Clock className="size-4.5" aria-hidden />
@@ -401,13 +416,13 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </Reveal>
           </div>
         </section>
 
         {/* CTA final */}
         <section className="pb-16 md:pb-20">
-          <div className="overflow-hidden rounded-card border border-border bg-gradient-to-br from-primary-faint via-background to-primary-soft/70 p-8 text-center shadow-card sm:p-12">
+          <Reveal className="overflow-hidden rounded-card border border-border bg-gradient-to-br from-primary-faint via-background to-primary-soft/70 p-8 text-center shadow-card sm:p-12">
             <h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
               Prêt à gérer votre activité proprement ?
             </h2>
@@ -423,7 +438,7 @@ export default function HomePage() {
               Créer mon compte
               <ArrowRight className="size-4" aria-hidden />
             </Link>
-          </div>
+          </Reveal>
         </section>
       </main>
 

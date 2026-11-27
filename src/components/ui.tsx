@@ -117,6 +117,7 @@ export function Card({
   children,
   actions,
   className = "",
+  hover = false,
 }: {
   title: string;
   subtitle?: string;
@@ -124,10 +125,13 @@ export function Card({
   children: ReactNode;
   actions?: ReactNode;
   className?: string;
+  hover?: boolean;
 }) {
   return (
     <section
-      className={`rounded-card border border-border bg-surface-raised p-4 shadow-card sm:p-5 ${className}`}
+      className={`rounded-card border border-border bg-surface-raised p-4 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-float sm:p-5 ${
+        hover ? "cursor-default" : ""
+      } ${className}`}
     >
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
@@ -307,8 +311,8 @@ export function Stat({
     warning: "bg-warning-soft text-warning",
   } as const;
   return (
-    <div className="flex items-center gap-3 rounded-card border border-border bg-surface-raised p-4 shadow-card">
-      <span className={`flex size-10 shrink-0 items-center justify-center rounded-control ${tones[tone]}`}>
+    <div className="group flex items-center gap-3 rounded-card border border-border bg-surface-raised p-4 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-float">
+      <span className={`flex size-10 shrink-0 items-center justify-center rounded-control ${tones[tone]} transition-transform duration-300 group-hover:scale-110`}>
         <Icon className="size-5" aria-hidden />
       </span>
       <div className="min-w-0">

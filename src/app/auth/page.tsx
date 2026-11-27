@@ -10,6 +10,7 @@ import {
   signUpPhone,
 } from "@/lib/auth-client";
 import { ApiErrorText, Button, Field, Input, Logo, Segmented } from "@/components/ui";
+import { Reveal } from "@/components/motion";
 
 /**
  * Connexion / Inscription (Module A + ADR-0016).
@@ -83,10 +84,13 @@ export default function AuthPage() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 p-6">
-      <div className="flex justify-center">
-        <Logo />
-      </div>
+      <Reveal>
+        <div className="flex justify-center">
+          <Logo />
+        </div>
+      </Reveal>
 
+      <Reveal delay={0.08}>
       <div className="rounded-card border border-border bg-surface-raised p-5 shadow-card sm:p-6">
         {inviteEmail && (
           <div className="mb-4 flex items-start gap-2 rounded-control border border-primary-soft bg-primary-soft/40 p-3 text-sm">
@@ -224,6 +228,7 @@ export default function AuthPage() {
           )}
         </form>
       </div>
+      </Reveal>
 
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
         <ShieldCheck className="size-3.5 text-success" aria-hidden />
