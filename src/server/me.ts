@@ -238,11 +238,11 @@ export async function devVerificationLink(headers: Headers): Promise<{
   url: string;
 }> {
   if (process.env.NODE_ENV === "production") {
-    throw new ApiError(404, "NOT_FOUND", "Not found");
+    throw new ApiError(404, "NOT_FOUND", "Introuvable");
   }
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
-  if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
+  if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Authentification requise");
   if (isVirtualEmail(session.user.email)) {
     // ADR-0016: phone accounts have no mailbox — no verification link can
     // ever be delivered. They are validated by the operator, not by mail.
@@ -253,7 +253,7 @@ export async function devVerificationLink(headers: Headers): Promise<{
     );
   }
   if (session.user.emailVerified) {
-    throw new ApiError(409, "ALREADY_VERIFIED", "Email already verified");
+    throw new ApiError(409, "ALREADY_VERIFIED", "Email déjà vérifié");
   }
 
   // Trigger a (re)send through the normal pipeline; non-production records
@@ -267,7 +267,7 @@ export async function devVerificationLink(headers: Headers): Promise<{
   );
   const last = mails[mails.length - 1];
   if (!last) {
-    throw new ApiError(500, "CAPTURE_FAILED", "Could not capture the mail");
+    throw new ApiError(500, "CAPTURE_FAILED", "Impossible de capter le courriel");
   }
   return { url: last.url };
 }

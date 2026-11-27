@@ -102,7 +102,7 @@ export async function authorize(
   if (roleStr === null) {
     throw new AuthorizationError(
       "NOT_A_MEMBER",
-      "You are not a member of this organization.",
+      "Vous n’êtes pas membre de cette organisation.",
     );
   }
 
@@ -116,7 +116,7 @@ export async function authorize(
   if (!roleHasPermission(roleStr, ctx.permission)) {
     throw new AuthorizationError(
       "FORBIDDEN",
-      `Role lacks permission: ${ctx.permission}`,
+      `Le rôle n’autorise pas : ${ctx.permission}`,
     );
   }
 
@@ -127,19 +127,25 @@ export async function authorize(
       // the branchId and widening access.
       throw new AuthorizationError(
         "NO_BRANCH_ACCESS",
-        `Permission ${ctx.permission} requires a branchId.`,
+        `La permission ${ctx.permission} nécessite une succursale.`,
       );
     }
-    const grants = await db
-      .select({ id: branchAccess.id })
-      .from(branchAccess)
-      .where(and(eq(branchAccess.userId, ctx.userId), eq(branchAccess.branchId, ctx.branchId)))
-      .limit(1);
-    if (grants.length === 0) {
-      throw new AuthorizationError(
-        "NO_BRANCH_ACCESS",
-        "You are not assigned to this branch.",
-      );
+    // Owners and admins pilot the whole organization: they reach every branch
+    // without a per-branch grant. Other roles (manager, cashier, seller,
+    // stock_manager, accountant) work only in the branches assigned to them.
+    const isOrgWide = roles.some((r) => r === "owner" || r === "admin");
+    if (!isOrgWide) {
+      const grants = await db
+        .select({ id: branchAccess.id })
+        .from(branchAccess)
+        .where(and(eq(branchAccess.userId, ctx.userId), eq(branchAccess.branchId, ctx.branchId)))
+        .limit(1);
+      if (grants.length === 0) {
+        throw new AuthorizationError(
+          "NO_BRANCH_ACCESS",
+          "Vous n’avez pas d’accès à cette succursale.",
+        );
+      }
     }
   }
 

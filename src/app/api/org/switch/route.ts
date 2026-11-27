@@ -18,7 +18,7 @@ export const POST = handleApi(async (req) => {
   const auth = getAuth();
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session?.user) {
-    throw new ApiError(401, "UNAUTHORIZED", "Sign in required.");
+    throw new ApiError(401, "UNAUTHORIZED", "Authentification requise.");
   }
 
   // Verify membership before switching (fail-closed).

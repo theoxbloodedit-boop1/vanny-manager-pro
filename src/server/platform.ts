@@ -91,7 +91,7 @@ export async function requireOperator(
   const session = await auth.api.getSession({ headers });
   const user = session?.user;
   if (!user?.id || !user?.email) {
-    throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
+    throw new ApiError(401, "UNAUTHORIZED", "Authentification requise");
   }
   if (!isAuthorizedPlatformOperator(user.email)) {
     throw new ApiError(

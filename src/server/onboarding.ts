@@ -64,7 +64,7 @@ export async function runOnboarding(
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
   if (!session?.user) {
-    throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
+    throw new ApiError(401, "UNAUTHORIZED", "Authentification requise");
   }
 
   // ADR-0016 verification gate (SERVER-side — before this ADR it existed only
@@ -129,7 +129,7 @@ export async function runOnboarding(
     db.select({ businessSector: organizations.businessSector }).from(organizations).where(eq(organizations.id, orgId)),
   );
   if (check[0]?.businessSector !== input.sector) {
-    throw new ApiError(500, "ONBOARDING_INCOMPLETE", "Organization not fully provisioned");
+    throw new ApiError(500, "ONBOARDING_INCOMPLETE", "Organisation non entièrement provisionnée");
   }
 
   return { orgId, branchId };

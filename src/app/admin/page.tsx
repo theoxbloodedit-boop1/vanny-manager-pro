@@ -151,6 +151,16 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok) throw new Error(data.message || "Action impossible");
   return data;
 }
+async function patch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await readBody<T>(res);
+  if (!res.ok) throw new Error(data.message || "Action impossible");
+  return data;
+}
 
 export default function AdminPage() {
   const router = useRouter();
@@ -210,6 +220,10 @@ export default function AdminPage() {
   const orgName = me.data?.organization?.name ?? "VANNY";
   const [branchName, setBranchName] = useState("");
   const [branchAddress, setBranchAddress] = useState("");
+  const [editBranch, setEditBranch] = useState<{ id: string; name: string; address: string; phone: string } | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editPhone, setEditPhone] = useState("");
   const [grantMember, setGrantMember] = useState("");
   const [grantBranch, setGrantBranch] = useState("");
   const [busy, setBusy] = useState<string>();
@@ -636,13 +650,62 @@ export default function AdminPage() {
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold">{b.name}</p>
                             {b.address ? <p className="truncate text-xs text-muted-foreground">{b.address}</p> : null}
+                            {b.phone ? (
+                              <p className="tabular-nums text-xs text-muted-foreground">{b.phone}</p>
+                            ) : null}
                           </div>
-                          {b.phone ? (
-                            <span className="tabular-nums text-xs text-muted-foreground">{b.phone}</span>
-                          ) : null}
+                          {canManage && (
+                            <Button
+                              variant="outline"
+                              className="h-8 px-2 text-xs"
+                              onClick={() => {
+                                setEditBranch({ id: b.id, name: b.name, address: b.address ?? "", phone: b.phone ?? "" });
+                                setEditName(b.name);
+                                setEditAddress(b.address ?? "");
+                                setEditPhone(b.phone ?? "");
+                                setErrors((e) => ({ ...e, branch: "" }));
+                              }}
+                            >
+                              Modifier
+                            </Button>
+                          )}
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {canManage && editBranch && (
+                    <div className="rounded-control border border-primary/30 bg-surface-inset p-3">
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                        Modifier « {editBranch.name} »
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                        <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nom" />
+                        <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="Téléphone (facultatif)" />
+                        <div className="flex self-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => setEditBranch(null)}
+                          >
+                            Annuler
+                          </Button>
+                          <Button
+                            loading={busy === "branch-edit"}
+                            onClick={() =>
+                              run("branch-edit", () => patch("/api/branches", { id: editBranch.id, name: editName, address: editAddress || null, phone: editPhone || null }), () => {
+                                setEditBranch(null);
+                                qc.invalidateQueries({ queryKey: ["branches"] });
+                              })
+                            }
+                          >
+                            Enregistrer
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="Adresse (facultatif)" />
+                      </div>
+                      <ApiErrorText error={errors["branch-edit"]} />
+                    </div>
                   )}
                   {canManage && (
                     <div className="grid gap-3 rounded-control bg-surface p-3 sm:grid-cols-[1fr_auto]">

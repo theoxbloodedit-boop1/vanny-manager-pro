@@ -27,7 +27,7 @@ export async function requireActiveOrg(headers: Headers): Promise<{
 }> {
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
-  if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
+  if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Authentification requise");
   const orgId = session.session.activeOrganizationId;
   if (!orgId) {
     throw new ApiError(
@@ -68,6 +68,51 @@ export async function createBranch(headers: Headers, raw: unknown) {
 }
 
 /**
+ * Update a branch's details (name, address, phone, active flag).
+ * Body: { id, name?, address?, phone?, isActive? }. At least one field.
+ */
+const updateBranchBody = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(120).optional(),
+  address: z.string().max(500).nullable().optional(),
+  phone: z.string().max(32).nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export async function updateBranch(headers: Headers, raw: unknown) {
+  const body = updateBranchBody.parse(raw);
+  const { userId, orgId } = await requireActiveOrg(headers);
+
+  const changed = await withTenantDb(orgId, async (db) => {
+    await authorize(db, { userId, permission: "branches.manage" });
+    // The branch must belong to THIS org (RLS-scoped: foreign id → no row).
+    const rows = await db
+      .select({ id: branches.id })
+      .from(branches)
+      .where(eq(branches.id, body.id));
+    if (rows.length === 0) {
+      throw new ApiError(404, "NOT_FOUND", "Succursale introuvable.");
+    }
+    const fields: Record<string, unknown> = {};
+    if (body.name !== undefined) fields.name = body.name;
+    if (body.address !== undefined) fields.address = body.address;
+    if (body.phone !== undefined) fields.phone = body.phone;
+    if (body.isActive !== undefined) fields.isActive = body.isActive;
+    const result = await db
+      .update(branches)
+      .set(fields)
+      .where(eq(branches.id, body.id))
+      .returning({ id: branches.id });
+    return result[0]?.id ?? null;
+  });
+
+  if (!changed) {
+    throw new ApiError(404, "NOT_FOUND", "Succursale introuvable.");
+  }
+  return { ok: true };
+}
+
+/**
  * Grant a USER (already a member) access to a BRANCH. The org-level role
  * lives in `member`; this table only answers "may this person work here?".
  */
@@ -95,10 +140,10 @@ export async function grantBranchAccess(headers: Headers, raw: unknown) {
     return { branchOk: branchRows.length > 0, memberOk: memberRows.length > 0 };
   });
   if (!checked.branchOk) {
-    throw new ApiError(400, "INVALID_BRANCH", "Branch not found");
+    throw new ApiError(400, "INVALID_BRANCH", "Succursale introuvable");
   }
   if (!checked.memberOk) {
-    throw new ApiError(400, "NOT_A_MEMBER", "User is not a member of this organization");
+    throw new ApiError(400, "NOT_A_MEMBER", "Cet utilisateur n’est pas membre de l’organisation");
   }
 
   await withTenantDb(orgId, (db) =>
@@ -160,7 +205,7 @@ export async function inviteMember(headers: Headers, raw: unknown) {
       return rows.length === wantedBranchIds.length;
     });
     if (!valid) {
-      throw new ApiError(400, "INVALID_BRANCH", "Unknown branch for this organization");
+      throw new ApiError(400, "INVALID_BRANCH", "Succursale inconnue pour cette organisation");
     }
   } else {
     await withTenantDb(orgId, (db) =>
@@ -220,7 +265,7 @@ export async function changeMemberRole(headers: Headers, raw: unknown) {
       .from(members)
       .where(eq(members.id, body.memberId));
     if (rows.length === 0) {
-      throw new ApiError(404, "MEMBER_NOT_FOUND", "Member not found");
+      throw new ApiError(404, "MEMBER_NOT_FOUND", "Membre introuvable");
     }
     const owners = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -233,7 +278,7 @@ export async function changeMemberRole(headers: Headers, raw: unknown) {
     !body.role.includes("owner") &&
     target.ownerCount <= 1
   ) {
-    throw new ApiError(400, "LAST_OWNER", "An organization must keep at least one owner");
+    throw new ApiError(400, "LAST_OWNER", "Une organisation doit garder au moins un propriétaire");
   }
 
   await auth.api.updateMemberRole({
@@ -279,7 +324,7 @@ export async function listMembers(headers: Headers) {
 export async function myInvitations(headers: Headers) {
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
-  if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
+  if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Authentification requise");
   return auth.api.listUserInvitations({ headers });
 }
 
@@ -299,7 +344,7 @@ export async function acceptInvitation(headers: Headers, raw: unknown) {
   const body = z.object({ invitationId: z.string().min(1) }).parse(raw);
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
-  if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Sign in required");
+  if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Authentification requise");
   // ADR-0014 verification gate, ADR-0020 revised. The plugin's own email
   // check on acceptance is disabled (requireEmailVerificationOnInvitation:
   // false), so we enforce it here. A user may accept if their email is
