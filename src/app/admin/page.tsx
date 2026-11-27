@@ -15,6 +15,9 @@ import {
   KeyRound,
   Banknote,
   Trash2,
+  Truck,
+  Smartphone,
+  ScrollText,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import {
@@ -51,6 +54,12 @@ import { StockPanel } from "@/components/stock-panel";
 import { CategoryManager } from "@/components/category-manager";
 import { BrandingPanel } from "@/components/branding-panel";
 import { VaultPanel } from "@/components/vault-panel";
+import {
+  ExpensePanel,
+  SupplierPanel,
+  SyncPanel,
+  ActivityPanel,
+} from "@/components/sections-panels";
 import { OrgSelector } from "@/components/org-selector";
 import {
   AdminMobileNav,
@@ -458,9 +467,13 @@ export default function AdminPage() {
                     [
                       { id: "catalog" as AdminSection, label: "Catalogue", icon: Package },
                       { id: "stock" as AdminSection, label: "Stock", icon: Boxes },
+                      { id: "vault" as AdminSection, label: "Coffre-fort", icon: Banknote },
+                      { id: "expenses" as AdminSection, label: "Dépenses", icon: Banknote },
+                      { id: "suppliers" as AdminSection, label: "Fournisseurs", icon: Truck },
+                      { id: "sync" as AdminSection, label: "Synchronisation", icon: Smartphone },
+                      { id: "activity" as AdminSection, label: "Activité", icon: ScrollText },
                       { id: "team" as AdminSection, label: "Équipe", icon: Users },
                       { id: "branches" as AdminSection, label: "Succursales", icon: Store },
-                      { id: "vault" as AdminSection, label: "Coffre-fort", icon: Banknote },
                       { id: "branding" as AdminSection, label: "Identité", icon: Palette },
                       { id: "overview" as AdminSection, label: "Vue d’ensemble", icon: KeyRound },
                     ]
@@ -964,6 +977,26 @@ export default function AdminPage() {
           {/* ---- VAULT (COFFRE-FORT) ---- */}
           {section === "vault" && (
             <VaultPanel permissions={me.data.permissions ?? []} />
+          )}
+
+          {/* ---- DÉPENSES ---- */}
+          {section === "expenses" && (
+            <ExpensePanel />
+          )}
+
+          {/* ---- FOURNISSEURS ---- */}
+          {section === "suppliers" && (
+            <SupplierPanel />
+          )}
+
+          {/* ---- APPAREILS / SYNCHRONISATION ---- */}
+          {section === "sync" && (
+            <SyncPanel />
+          )}
+
+          {/* ---- JOURNAL D'ACTIVITÉ ---- */}
+          {section === "activity" && (
+            <ActivityPanel />
           )}
           </motion.div>
           </AnimatePresence>

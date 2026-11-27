@@ -10,6 +10,9 @@ import {
   Receipt,
   Store,
   Users,
+  Truck,
+  Smartphone,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -30,7 +33,11 @@ export type AdminSection =
   | "team"
   | "branches"
   | "branding"
-  | "vault";
+  | "vault"
+  | "expenses"
+  | "suppliers"
+  | "sync"
+  | "activity";
 
 interface NavItem {
   id: AdminSection;
@@ -43,6 +50,10 @@ const NAV: NavItem[] = [
   { id: "catalog", label: "Catalogue", icon: Package },
   { id: "stock", label: "Stock", icon: Boxes },
   { id: "vault", label: "Coffre-fort", icon: Banknote },
+  { id: "expenses", label: "Dépenses", icon: Banknote },
+  { id: "suppliers", label: "Fournisseurs", icon: Truck },
+  { id: "sync", label: "Synchronisation", icon: Smartphone },
+  { id: "activity", label: "Activité", icon: ScrollText },
   { id: "team", label: "Équipe", icon: Users },
   { id: "branches", label: "Succursales", icon: Store },
   { id: "branding", label: "Identité", icon: Palette },
