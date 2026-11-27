@@ -21,6 +21,8 @@ import {
   CircleDollarSign,
   CloudOff,
   CloudCheck,
+  MessageSquare,
+  FileText,
 } from "lucide-react";
 import {
   Button,
@@ -40,6 +42,7 @@ import {
   buildTicket,
   type PrinterDevice,
 } from "@/lib/printer";
+import { buildInvoicePdf, shareInvoicePdf, type InvoiceData } from "@/lib/invoice";
 
 interface Branch {
   id: string;
@@ -48,8 +51,10 @@ interface Branch {
 interface Product {
   id: string;
   name: string;
-  prices?: { currency: string; amountMinor: string }[];
-  stock?: number;
+  categoryName?: string | null;
+  priceUsdMinor?: number | null;
+  priceCdfMinor?: number | null;
+  totalStock?: number | null;
   imageUrl?: string | null;
 }
 interface Customer {
@@ -142,6 +147,8 @@ export default function SalesPage() {
   const [pendingCount, setPendingCount] = useState<number>(
     () => (typeof window === "undefined" ? 0 : readQueue().length),
   );
+  const [lastInvoice, setLastInvoice] = useState<{ data: InvoiceData; pdf: Blob } | null>(null);
+  const [sendingInvoice, setSendingInvoice] = useState(false);
 
   const formatAmount = (minor: number) =>
     new Intl.NumberFormat("fr-FR").format(minor) + " " + currency;
@@ -181,6 +188,11 @@ export default function SalesPage() {
     mutationFn: async () => flushQueue(),
   });
 
+  const me = useQuery<{ user?: { name?: string } }>({
+    queryKey: ["me"],
+    queryFn: () => getJson<{ user?: { name?: string } }>("/api/me"),
+  });
+  const sellerName = me.data?.user?.name ?? "Vendeur";
   const branches = useQuery<Branch[]>({
     queryKey: ["branches"],
     queryFn: () => getJson<Branch[]>("/api/branches"),
@@ -199,16 +211,17 @@ export default function SalesPage() {
     enabled: Boolean(branchId),
   });
 
-  const productPrice = (p: Product): number => {
-    const price =
-      p.prices?.find((pr) => pr.currency === currency) ??
-      p.prices?.find((pr) => pr.currency === "CDF") ??
-      p.prices?.[0];
-    return price ? Number(price.amountMinor) : 0;
-  };
+  // Prix dans la devise de la caisse. USD et CDF sont strictement separes
+  // (ADR-0005) : on ne convertit jamais. Si le produit n'a pas de prix dans
+  // la devise choisie, il est invendable dans cette devise.
+  const productPrice = (p: Product): number | null =>
+    currency === "USD" ? p.priceUsdMinor ?? null : p.priceCdfMinor ?? null;
+
+  const hasPriceInCurrency = (p: Product): boolean => productPrice(p) !== null;
 
   const addProduct = (p: Product) => {
     const price = productPrice(p);
+    if (price === null) return; // pas de prix dans la devise de la caisse
     setCart((prev) => {
       const idx = prev.findIndex((c) => c.productId === p.id);
       if (idx >= 0) {
@@ -319,6 +332,7 @@ export default function SalesPage() {
     onSuccess: async () => {
       const sold = cart;
       const soldCustomer = customerName;
+      const soldCustomerPhone = customerPhone;
       setCart([]);
       setCustomerName("");
       setCustomerPhone("");
@@ -327,7 +341,27 @@ export default function SalesPage() {
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["products"] });
-      // Print the ticket automatically if a printer is connected.
+      // Génère automatiquement la facture PDF de la vente.
+      const branchName = branches.data?.find((b) => b.id === branchId)?.name ?? "";
+      const invoiceData: InvoiceData = {
+        orgName: "VANNY",
+        branchName,
+        customerName: soldCustomer,
+        customerPhone: soldCustomerPhone,
+        sellerName,
+        currency,
+        paymentMethod: "cash",
+        lines: sold.map((c) => ({
+          name: c.name,
+          qty: c.qty,
+          unitPriceMinor: c.unitPriceMinor,
+        })),
+        totalMinor: sold.reduce((sum, c) => sum + c.qty * c.unitPriceMinor, 0),
+        dateLabel: new Date().toLocaleString("fr-FR"),
+      };
+      const pdf = buildInvoicePdf(invoiceData);
+      setLastInvoice({ data: invoiceData, pdf });
+      // Imprimante : ticket automatique si connectée.
       if (printer && sold.length > 0) {
         await doPrint(sold, soldCustomer || "Vendeur").catch(() => {});
       }
@@ -479,12 +513,16 @@ export default function SalesPage() {
                         )}
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{p.name}</p>
-                          <p className="text-xs text-muted-foreground">{formatAmount(productPrice(p))}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {p.categoryName ? `${p.categoryName} · ` : ""}
+                            {hasPriceInCurrency(p) ? formatAmount(productPrice(p)!) : "prix n/a en " + currency}
+                          </p>
                         </div>
                       </div>
                       <Button
                         variant="outline"
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 disabled:opacity-40"
+                        disabled={!hasPriceInCurrency(p)}
                         onClick={() => addProduct(p)}
                         aria-label={`Ajouter ${p.name}`}
                       >
@@ -597,6 +635,46 @@ export default function SalesPage() {
                 >
                   <Check className="size-4" /> Enregistrer la vente
                 </Button>
+                {lastInvoice && (
+                  <div className="space-y-2 rounded-control bg-success-soft p-3">
+                    <p className="flex items-center gap-1.5 text-sm font-bold text-success">
+                      <FileText className="size-4" /> Facture PDF générée
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        className="flex-1"
+                        loading={sendingInvoice}
+                        onClick={async () => {
+                          setSendingInvoice(true);
+                          try {
+                            await shareInvoicePdf(
+                              lastInvoice.pdf,
+                              lastInvoice.data.customerPhone,
+                              `Facture VANNY — ${lastInvoice.data.customerName} — total ${lastInvoice.data.totalMinor} ${lastInvoice.data.currency}`,
+                            );
+                          } finally {
+                            setSendingInvoice(false);
+                          }
+                        }}
+                      >
+                        <MessageSquare className="size-4" /> Envoyer par WhatsApp
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const url = URL.createObjectURL(lastInvoice.pdf);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = "facture.pdf";
+                          a.click();
+                          setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        }}
+                      >
+                        <FileText className="size-4" /> Télécharger
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
           </Reveal>

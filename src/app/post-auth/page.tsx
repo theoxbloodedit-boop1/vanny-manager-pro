@@ -82,9 +82,15 @@ export default function PostAuthPage() {
     enabled: !!me?.user && !me?.organization,
   });
 
-  // Already have an organization → straight to the admin shell.
+  // Already have an organization → route by role.
+  // Sellers and cashiers land on the point of sale (their dashboard);
+  // owners/managers land on the admin shell.
   useEffect(() => {
-    if (me?.authenticated && me.organization) router.replace("/admin");
+    if (me?.authenticated && me.organization) {
+      const role = me.role ?? "";
+      const isSalesFloor = role.includes("seller") || role.includes("cashier");
+      router.replace(isSalesFloor ? "/sales" : "/admin");
+    }
     if (me && !me.authenticated) router.replace("/auth");
   }, [me, router]);
 
