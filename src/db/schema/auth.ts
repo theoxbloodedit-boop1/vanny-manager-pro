@@ -146,6 +146,13 @@ export const invitations = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
+    /**
+     * ADR-0032: invitee's WhatsApp number in E.164 (e.g. "+243971234567").
+     * Optional. When present, a phone account registering with this number
+     * can accept the invitation by phone match (email accounts match by
+     * email as before). NULL when only an email was provided.
+     */
+    phone: text("phone"),
     role: text("role").notNull(),
     status: text("status").notNull().default("pending"),
     teamId: text("team_id"),

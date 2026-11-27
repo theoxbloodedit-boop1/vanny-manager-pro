@@ -44,9 +44,16 @@ export default function AuthPage() {
   // canonical "sync from an external system" effect — the rule it trips is
   // about effects that re-run / cascade, not one-shot mount hydration.
   useEffect(() => {
-    const email = new URLSearchParams(window.location.search).get("email");
-    if (email && email.includes("@")) {
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get("email");
+    const phone = params.get("phone");
+    if (phone) {
+      // ADR-0032: WhatsApp invitation — pre-fill the phone sign-up.
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot mount hydration from the URL (see comment above)
+      setPhone(phone);
+      setMode("signup");
+      setSignupVia("phone");
+    } else if (email && email.includes("@")) {
       setInviteEmail(email);
       setMode("signup");
       setSignupVia("email");

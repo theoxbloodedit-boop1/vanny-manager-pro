@@ -634,7 +634,7 @@ export default function AdminPage() {
                         const phone = normalizeWaPhone(invPhone);
                         run(
                           "invite",
-                          () => post("/api/invitations", { email, role: invRole, branchIds: invBranches }),
+                          () => post("/api/invitations", { email, role: invRole, branchIds: invBranches, phone: invPhone || undefined }),
                           () => {
                             setLastInvite({ email, phone });
                             setInvEmail("");
@@ -992,8 +992,9 @@ function ShareInviteControls({
 
   function openWhatsApp() {
     if (!e164) return;
-    const appUrl = buildInviteAppUrl(window.location.origin, email);
-    const url = buildWhatsAppUrl(e164, buildInviteMessage(orgName, email, appUrl));
+    const sharePhone = phone || e164;
+    const appUrl = buildInviteAppUrl(window.location.origin, email, sharePhone);
+    const url = buildWhatsAppUrl(e164, buildInviteMessage(orgName, email, appUrl, sharePhone));
     window.open(url, "_blank", "noopener,noreferrer");
     onDone();
   }

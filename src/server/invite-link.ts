@@ -54,11 +54,19 @@ export function normalizeWaPhone(raw: string): string | null {
 
 /**
  * The shareable app link: the auth page pre-filled with the invitee's email.
+ * When a WhatsApp number is provided (ADR-0032), it is also pre-filled so a
+ * WhatsApp account can register by phone and still accept the invitation.
  * `baseUrl` should be the origin serving the app (window.location.origin on
  * the client).
  */
-export function buildInviteAppUrl(baseUrl: string, email: string): string {
-  return `${baseUrl.replace(/\/+$/, "")}/auth?email=${encodeURIComponent(email)}`;
+export function buildInviteAppUrl(
+  baseUrl: string,
+  email: string,
+  phone?: string | null,
+): string {
+  const base = `${baseUrl.replace(/\/+$/, "")}/auth?email=${encodeURIComponent(email)}`;
+  if (phone) return `${base}&phone=${encodeURIComponent(phone)}`;
+  return base;
 }
 
 /** The WhatsApp pre-fill message (fr, plain text — wa.me renders no markup). */
@@ -66,11 +74,14 @@ export function buildInviteMessage(
   orgName: string,
   email: string,
   appUrl: string,
+  phone?: string | null,
 ): string {
+  const register = phone
+    ? `créez votre compte avec le numéro ${phone} (ou l'adresse ${email})`
+    : `créez votre compte (ou connectez-vous) avec l'adresse ${email}`;
   return (
     `Bonjour ! Vous avez été invité·e à rejoindre « ${orgName} » sur ` +
-    `VANNY Manager Pro. Créez votre compte (ou connectez-vous) avec l'adresse ` +
-    `${email}, puis acceptez l'invitation : ${appUrl}`
+    `VANNY Manager Pro. ${register}, puis acceptez l'invitation : ${appUrl}`
   );
 }
 

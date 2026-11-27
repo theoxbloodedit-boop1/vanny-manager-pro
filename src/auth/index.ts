@@ -104,6 +104,7 @@ export function createAuth() {
           invitation: {
             additionalFields: {
               branchIds: { type: "string", required: false },
+              phone: { type: "string", required: false },
             },
           },
         },

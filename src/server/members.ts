@@ -1,4 +1,4 @@
-import { eq, inArray, sql, desc } from "drizzle-orm";
+import { eq, inArray, or, sql, desc, type SQL } from "drizzle-orm";
 import * as z from "zod";
 import { getAuthDb } from "../auth/db";
 import { getAuth } from "../auth";
@@ -10,6 +10,7 @@ import { customers } from "../db/schema/sales";
 import { uuidv7 } from "../lib/uuid";
 import { ApiError } from "./errors";
 import { isManuallyApproved } from "./manual-approval";
+import { normalizePhone, PhoneError } from "./phone";
 import { authorize } from "./rbac/authorize";
 import { ROLES, type Role } from "./rbac/permissions";
 
@@ -207,11 +208,10 @@ const inviteBody = z.object({
   email: z.string().email().max(200),
   role: z.enum(inviteableRoles),
   /**
-   * ADR-0020: branch grants are now OPTIONAL. An owner can invite someone to
-   * the organization with no branch access yet (granted later via the branch
-   * access panel). Previously >= 1 branch was required, which blocked
-   * invitations for orgs with no branch set up.
+   * ADR-0032: invitee's WhatsApp number (E.164). Lets a WhatsApp-only account
+   * (no real mailbox) accept the invitation by phone match.
    */
+  phone: z.string().max(32).optional(),
   branchIds: z.array(z.string().uuid()).max(50).optional(),
 });
 
@@ -224,6 +224,19 @@ const inviteBody = z.object({
  */
 export async function inviteMember(headers: Headers, raw: unknown) {
   const body = inviteBody.parse(raw);
+  // Normalize the invitee's WhatsApp number to E.164 so a phone account can
+  // match this invitation later (ADR-0032). Invalid → clear French error.
+  let invitePhone: string | undefined;
+  if (body.phone) {
+    try {
+      invitePhone = normalizePhone(body.phone);
+    } catch (e) {
+      if (e instanceof PhoneError) {
+        throw new ApiError(400, "INVALID_PHONE", `Numéro WhatsApp invalide : ${e.message}`);
+      }
+      throw e;
+    }
+  }
   const { userId, orgId } = await requireActiveOrg(headers);
 
   const wantedBranchIds = body.branchIds ? [...new Set(body.branchIds)] : [];
@@ -256,6 +269,7 @@ export async function inviteMember(headers: Headers, raw: unknown) {
       role: body.role,
       organizationId: orgId,
       branchIds: JSON.stringify(wantedBranchIds),
+      ...(invitePhone ? { phone: invitePhone } : {}),
     },
     headers,
   });
@@ -356,19 +370,42 @@ export async function listMembers(headers: Headers) {
   return result;
 }
 
-/** Pending invitations addressed to the signed-in user's email. */
+/**
+ * Read the signed-in user's WhatsApp number (E.164) from the platform user
+ * row. The Better Auth session only carries name/email/emailVerified — the
+ * phone number (ADR-0016) is a custom column read separately (as in me.ts).
+ */
+async function getUserPhone(userId: string): Promise<string | null> {
+  const row = await getAuthDb()
+    .select({ phone: users.phone })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return row[0]?.phone ?? null;
+}
+
+/** Pending invitations addressed to the signed-in user's email or phone. */
 export async function myInvitations(headers: Headers) {
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
   if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Authentification requise");
 
-  // ADR-0020: the invitation is the trust anchor. `listUserInvitations` is
-  // email-gated, which blocks an unverified invitee from ever seeing (and
-  // thus accepting) their invitation. Read the invitation rows directly by
-  // the session email so an unverified user holding a valid pending
-  // invitation can accept it (the accept gate already permits this).
-  if (session.user.email) {
+  // ADR-0020/0032: the invitation is the trust anchor. `listUserInvitations`
+  // is email-gated, which blocks an unverified invitee from ever seeing (and
+  // thus accepting) their invitation. Read the invitation rows directly by the
+  // session email OR phone (a WhatsApp account has no real email — its
+  // deterministic virtual email never matches an email-based invitation, so we
+  // match on `user.phone`). The accept gate already permits this.
+  const phone = await getUserPhone(session.user.id);
+
+  if (session.user.email || phone) {
     const db = getAuthDb();
+    const emailCond = session.user.email
+      ? eq(invitations.email, session.user.email)
+      : null;
+    const phoneCond = phone
+      ? eq(invitations.phone, phone)
+      : null;
     return db
       .select({
         id: invitations.id,
@@ -376,9 +413,14 @@ export async function myInvitations(headers: Headers) {
         email: invitations.email,
         role: invitations.role,
         status: invitations.status,
+        phone: invitations.phone,
       })
       .from(invitations)
-      .where(eq(invitations.email, session.user.email))
+      .where(
+        or(
+          ...([emailCond, phoneCond].filter((c): c is NonNullable<typeof c> => Boolean(c)) as SQL[]),
+        ),
+      )
       .orderBy(desc(invitations.createdAt));
   }
   return auth.api.listUserInvitations({ headers });
@@ -432,6 +474,7 @@ export async function acceptInvitation(headers: Headers, raw: unknown) {
       const invRows = await db
         .select({
           email: invitations.email,
+          phone: invitations.phone,
           status: invitations.status,
           expiresAt: invitations.expiresAt,
         })
@@ -439,10 +482,15 @@ export async function acceptInvitation(headers: Headers, raw: unknown) {
         .where(eq(invitations.id, body.invitationId))
         .limit(1);
       const inv = invRows[0];
+      const phone = await getUserPhone(session.user.id);
+      // ADR-0032: the recipient may match by email OR by WhatsApp number (a
+      // WhatsApp account's virtual email never equals the invitation email).
       const held =
         inv !== undefined &&
         inv.status === "pending" &&
-        inv.email.toLowerCase() === session.user.email.toLowerCase() &&
+        ((!!session.user.email &&
+          inv.email.toLowerCase() === session.user.email.toLowerCase()) ||
+          (!!phone && !!inv.phone && inv.phone === phone)) &&
         (inv.expiresAt.getTime() > Date.now());
       if (!held) {
         throw new ApiError(
