@@ -47,6 +47,7 @@ interface Product {
   name: string;
   prices?: { currency: string; amountMinor: string }[];
   stock?: number;
+  imageUrl?: string | null;
 }
 interface Customer {
   id: string;
@@ -332,9 +333,19 @@ export default function SalesPage() {
                 <ul className="max-h-72 space-y-1 overflow-y-auto pr-1">
                   {products.data?.map((p) => (
                     <li key={p.id} className="flex items-center justify-between gap-2 rounded-control bg-surface-inset p-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatAmount(productPrice(p))}</p>
+                      <div className="flex min-w-0 items-center gap-2">
+                        {p.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.imageUrl} alt="" className="size-9 shrink-0 rounded-control object-cover" />
+                        ) : (
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary-soft text-primary">
+                            <Package className="size-4" />
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatAmount(productPrice(p))}</p>
+                        </div>
                       </div>
                       <Button
                         variant="outline"
@@ -359,6 +370,17 @@ export default function SalesPage() {
                 <ul className="space-y-2">
                   {cart.map((c) => (
                     <li key={c.productId} className="flex items-center gap-2">
+                      {(() => {
+                        const prod = products.data?.find((x) => x.id === c.productId);
+                        return prod?.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={prod.imageUrl} alt="" className="size-9 shrink-0 rounded-control object-cover" />
+                        ) : (
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary-soft text-primary">
+                            <Package className="size-4" />
+                          </span>
+                        );
+                      })()}
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold">{c.name}</span>
                       <div className="flex items-center gap-1">
                         <Button variant="outline" className="h-7 w-7 p-0" onClick={() => setQty(c.productId, c.qty - 1)} aria-label="diminuer">–</Button>
