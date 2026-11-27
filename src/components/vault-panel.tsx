@@ -228,7 +228,7 @@ export function VaultPanel({ permissions }: { permissions: string[] }) {
                             />
                             <Button
                               type="button"
-                              className="h-8 px-2 text-xs"
+                              className="min-h-10 px-2 text-xs"
                               loading={!!busy}
                               disabled={!!busy}
                               onClick={async () => {
@@ -244,7 +244,7 @@ export function VaultPanel({ permissions }: { permissions: string[] }) {
                         {canManage && o.status !== "paid" && (
                           <Button
                             type="button"
-                            className="h-8 mt-2 px-2 text-xs"
+                            className="min-h-10 mt-2 px-2 text-xs"
                             variant="outline"
                             loading={!!busy}
                             disabled={!!busy}
@@ -257,7 +257,7 @@ export function VaultPanel({ permissions }: { permissions: string[] }) {
                         {canManage && (
                           <Button
                             type="button"
-                            className="h-8 mt-2 px-2 text-xs text-danger"
+                            className="min-h-10 mt-2 px-2 text-xs text-danger"
                             variant="ghost"
                             loading={!!busy}
                             disabled={!!busy}
@@ -387,11 +387,11 @@ function VaultActions({
         <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex. caisse du jour" maxLength={200} />
       </Field>
       <div className="flex gap-2">
-        <Button type="button" className="h-8 px-2 text-xs" loading={busy} onClick={() => submit("deposit")}>
+        <Button type="button" className="min-h-10 px-2 text-xs" loading={busy} onClick={() => submit("deposit")}>
           <Plus className="size-3.5" />
           Déposer
         </Button>
-        <Button type="button" className="h-8 px-2 text-xs" variant="outline" loading={busy} onClick={() => submit("withdraw")}>
+        <Button type="button" className="min-h-10 px-2 text-xs" variant="outline" loading={busy} onClick={() => submit("withdraw")}>
           <TrendingDown className="size-3.5" />
           Retirer
         </Button>
@@ -442,7 +442,7 @@ function ObligationForm({
       <Field label="Nom de l’obligation">
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex. Loyer novembre" />
       </Field>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
           <option value="rent">Loyer</option>
           <option value="invoice">Facture</option>
@@ -454,7 +454,7 @@ function ObligationForm({
           <option value="CDF">CDF</option>
         </Select>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Input
           type="number"
           min={0.01}
@@ -465,7 +465,7 @@ function ObligationForm({
         />
         <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
       </div>
-      <Button type="button" className="h-8 px-2 text-xs" loading={disabled} onClick={submit}>
+      <Button type="button" className="min-h-10 px-2 text-xs" loading={disabled} onClick={submit}>
         <Plus className="size-3.5" />
         Ajouter l’obligation
       </Button>

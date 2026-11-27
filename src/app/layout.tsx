@@ -34,7 +34,9 @@ export const viewport: Viewport = {
   themeColor: "#0b5cff",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // Le zoom reste autorisé (accessibilité) — ne jamais bloquer l'agrandissement
+  // du texte sur mobile/tablette.
+  maximumScale: 5,
 };
 
 export default function RootLayout({

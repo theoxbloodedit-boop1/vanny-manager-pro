@@ -295,7 +295,7 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
                     />
                     <Button
                       variant="ghost"
-                      className="h-8 px-2 text-xs"
+                      className="min-h-10 px-2 text-xs"
                       onClick={() => setImageData("")}
                     >
                       <X className="size-3.5" />
@@ -393,14 +393,14 @@ export function CatalogPanel({ canEdit }: { canEdit: boolean }) {
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
-                        className="h-8 px-2 text-xs"
+                        className="min-h-10 px-2 text-xs"
                         onClick={() => setActive(p, !p.isActive)}
                       >
                         {p.isActive ? "Désactiver" : "Réactiver"}
                       </Button>
                       <Button
                         variant="ghost"
-                        className="h-8 w-8 p-0 text-danger"
+                        className="min-h-10 w-10 p-0 text-danger"
                         aria-label={`Supprimer ${p.name}`}
                         onClick={() => remove(p)}
                       >

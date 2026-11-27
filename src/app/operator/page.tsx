@@ -224,7 +224,7 @@ export default function OperatorPage() {
                     </div>
                     {confirming?.key === `phone:${u.phone}` ? null : (
                       <Button
-                        className="min-h-9"
+                        className="min-h-10"
                         onClick={() => {
                           setReason(DEFAULT_APPROVE_REASON);
                           setError(undefined);
@@ -306,7 +306,7 @@ export default function OperatorPage() {
                     </div>
                     {confirming?.key === `email:${u.email}` ? null : (
                       <Button
-                        className="min-h-9"
+                        className="min-h-10"
                         onClick={() => {
                           setReason(
                             "Identité confirmée — invité d’organisation",

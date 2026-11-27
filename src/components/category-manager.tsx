@@ -161,7 +161,7 @@ export function CategoryManager({ canEdit }: { canEdit: boolean }) {
                   <Input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="min-h-9"
+                    className="min-h-10"
                   />
                   <div className="flex shrink-0 gap-1">
                     {COLOR_PRESETS.slice(0, 4).map((col) => (
@@ -175,10 +175,10 @@ export function CategoryManager({ canEdit }: { canEdit: boolean }) {
                       />
                     ))}
                   </div>
-                  <Button variant="ghost" className="min-h-9 px-2" onClick={() => saveEdit(c)} disabled={busy}>
+                  <Button variant="ghost" className="min-h-10 px-2" onClick={() => saveEdit(c)} disabled={busy}>
                     <Check className="size-4" aria-hidden />
                   </Button>
-                  <Button variant="ghost" className="min-h-9 px-2" onClick={() => setEditingId(null)}>
+                  <Button variant="ghost" className="min-h-10 px-2" onClick={() => setEditingId(null)}>
                     <X className="size-4" aria-hidden />
                   </Button>
                 </div>
@@ -190,16 +190,16 @@ export function CategoryManager({ canEdit }: { canEdit: boolean }) {
                   </div>
                   {canEdit && (
                     <div className="flex shrink-0 items-center gap-1">
-                      <Button variant="ghost" className="min-h-9 px-2" onClick={() => move(c, -1)} disabled={i === 0 || busy} title="Monter">
+                      <Button variant="ghost" className="min-h-10 px-2" onClick={() => move(c, -1)} disabled={i === 0 || busy} title="Monter">
                         <GripVertical className="size-4 rotate-180" aria-hidden />
                       </Button>
-                      <Button variant="ghost" className="min-h-9 px-2" onClick={() => move(c, 1)} disabled={i === (categories.data?.length ?? 1) - 1 || busy} title="Descendre">
+                      <Button variant="ghost" className="min-h-10 px-2" onClick={() => move(c, 1)} disabled={i === (categories.data?.length ?? 1) - 1 || busy} title="Descendre">
                         <GripVertical className="size-4" aria-hidden />
                       </Button>
-                      <Button variant="ghost" className="min-h-9 px-2" onClick={() => startEdit(c)} title="Modifier">
+                      <Button variant="ghost" className="min-h-10 px-2" onClick={() => startEdit(c)} title="Modifier">
                         <Tag className="size-4" aria-hidden />
                       </Button>
-                      <Button variant="ghost" className="min-h-9 px-2 text-accent" onClick={() => remove(c)} disabled={busy} title="Supprimer">
+                      <Button variant="ghost" className="min-h-10 px-2 text-accent" onClick={() => remove(c)} disabled={busy} title="Supprimer">
                         <Trash2 className="size-4" aria-hidden />
                       </Button>
                     </div>
@@ -218,7 +218,7 @@ export function CategoryManager({ canEdit }: { canEdit: boolean }) {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Nouvelle catégorie…"
-              className="min-h-9"
+              className="min-h-10"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -238,7 +238,7 @@ export function CategoryManager({ canEdit }: { canEdit: boolean }) {
                 />
               ))}
             </div>
-            <Button loading={busy} onClick={add} className="min-h-9 shrink-0">
+            <Button loading={busy} onClick={add} className="min-h-10 shrink-0">
               <Plus className="size-4" aria-hidden />
               Ajouter
             </Button>

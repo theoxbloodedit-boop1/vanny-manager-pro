@@ -438,7 +438,7 @@ export default function AdminPage() {
                                 }),
                               )
                             }
-                            className="min-h-9 rounded-control border border-border bg-surface-raised px-2 text-sm font-medium disabled:opacity-50"
+                            className="min-h-10 rounded-control border border-border bg-surface-raised px-2 text-sm font-medium disabled:opacity-50"
                           >
                             {ASSIGNABLE_ROLES.map((r) => (
                               <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -463,7 +463,7 @@ export default function AdminPage() {
                     <Field label="Numéro WhatsApp de l'invité (optionnel)" hint="Pour partager le lien d'invitation directement sur WhatsApp.">
                       <Input type="tel" value={invPhone} onChange={(e) => setInvPhone(e.target.value)} placeholder="+243 978 508 099" autoComplete="off" />
                     </Field>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <Field label="Rôle">
                         <Select value={invRole} onChange={(e) => setInvRole(e.target.value)}>
                           {ASSIGNABLE_ROLES.map((r) => (
@@ -555,7 +555,7 @@ export default function AdminPage() {
                             <div className="flex shrink-0 gap-2">
                               <Button
                                 variant="outline"
-                                className="min-h-9"
+                                className="min-h-10"
                                 title="Partager le lien d'invitation sur WhatsApp"
                                 aria-label={`Partager l'invitation de ${i.email} sur WhatsApp`}
                                 onClick={() => setWaRow(waRow === i.id ? null : i.id)}
@@ -565,7 +565,7 @@ export default function AdminPage() {
                               </Button>
                               <Button
                                 variant="danger"
-                                className="min-h-9"
+                                className="min-h-10"
                                 loading={busy === `cancel-${i.id}`}
                                 onClick={() =>
                                   run(`cancel-${i.id}`, () =>
@@ -650,7 +650,7 @@ export default function AdminPage() {
 
               {canManage && (
                 <Card title="Accès aux succursales" subtitle="Un membre ne travaille que dans les succursales qui lui sont assignées." icon={KeyRound}>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="Membre">
                       <Select value={grantMember} onChange={(e) => setGrantMember(e.target.value)}>
                         <option value="">— choisir —</option>

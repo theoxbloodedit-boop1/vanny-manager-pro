@@ -487,7 +487,7 @@ export default function PlatformPage() {
                 subtitle={`${selectedOrg.slug} · créé ${fmtDate(selectedOrg.createdAt)}`}
                 icon={Building2}
                 actions={
-                  <Button variant="outline" className="min-h-9" onClick={() => setSelectedOrg(null)}>
+                  <Button variant="outline" className="min-h-10" onClick={() => setSelectedOrg(null)}>
                     Fermer
                   </Button>
                 }
@@ -511,7 +511,7 @@ export default function PlatformPage() {
                     <div className="rounded-control bg-surface-inset p-4">
                       <div className="mb-3 flex items-center justify-between">
                         <h3 className="text-sm font-bold">Abonnement</h3>
-                        <Button className="min-h-9" onClick={() => setEditing((v) => !v)}>
+                        <Button className="min-h-10" onClick={() => setEditing((v) => !v)}>
                           {editing ? "Annuler" : "Modifier"}
                         </Button>
                       </div>

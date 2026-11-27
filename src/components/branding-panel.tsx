@@ -139,14 +139,14 @@ export function BrandingPanel() {
               onChange={onFile}
               className="hidden"
             />
-            <Button variant="outline" className="min-h-9 px-3 text-xs" onClick={() => fileRef.current?.click()}>
+            <Button variant="outline" className="min-h-10 px-3 text-xs" onClick={() => fileRef.current?.click()}>
               <ImagePlus className="size-3.5" aria-hidden />
               Changer
             </Button>
             {logoData && (
               <Button
                 variant="ghost"
-                className="min-h-9 px-3 text-xs text-accent"
+                className="min-h-10 px-3 text-xs text-accent"
                 onClick={() => setLogoData(null)}
               >
                 <Trash2 className="size-3.5" aria-hidden />

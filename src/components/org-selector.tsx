@@ -56,7 +56,7 @@ export function OrgSelector({
               type="button"
               disabled={active || !!busy}
               onClick={() => handle(o.id)}
-              className={`flex min-h-9 items-center gap-1.5 rounded-control px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`flex min-h-10 items-center gap-1.5 rounded-control px-3 py-1.5 text-xs font-semibold transition-colors ${
                 active
                   ? "bg-primary text-white shadow-card"
                   : "border border-border bg-surface-raised text-muted-foreground hover:bg-surface"
