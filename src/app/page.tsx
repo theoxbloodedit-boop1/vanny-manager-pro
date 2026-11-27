@@ -135,9 +135,18 @@ const COMING = [
 
 /**
  * ADR-0027 — Avis clients (illustratifs).
- * Portraits réalistes + témoignages naturels, pour donner vie au SaaS et
+ * Portraits réalistes + témoignages vécus, pour donner vie au SaaS et
  * inspirer confiance aux premiers utilisateurs.
  */
+
+/** Citation principale — mise en avant pour capter l'attention. */
+const FEATURED = {
+  quote:
+    "VANNY m'a redonné le contrôle de mon commerce. Je ne gère plus dans le flou : je pilote avec clarté, et mon équipe avance avec moi.",
+  name: "Amélie Kafula",
+  role: "Boutique · Lunetterie",
+};
+
 const TESTIMONIALS = [
   {
     name: "Amélie Kafula",
@@ -146,7 +155,7 @@ const TESTIMONIALS = [
     photo: "/testimonials/amelie-kafula.jpg",
     rating: 5,
     quote:
-      "Depuis que je gère mon catalogue et mon stock sur VANNY, je ne perds plus une vente. Tout est clair, et mon équipe avance sans que je doive tout ré-expliquer.",
+      "Avant, je comptais à la main et je perdais des ventes sans m'en rendre compte. Avec VANNY, mon stock est en temps réel : je sais quoi commander, qui vend, et mon équipe avance sans que je ré-explique rien.",
   },
   {
     name: "Pierre Ndambe",
@@ -155,7 +164,7 @@ const TESTIMONIALS = [
     photo: "/testimonials/pierre-ndambe.jpg",
     rating: 5,
     quote:
-      "Le contrôle du stock par succursale a changé mon quotidien. Fini les mauvaises surprises en fin de mois : je sais exactement où je suis, en un seul regard.",
+      "J'avais deux épiceries et je ne savais jamais vraiment où j'en étais. Aujourd'hui, je vois le stock de chaque succursale d'un seul regard — fini les mauvaises surprises, je pilote mon activité au jour le jour.",
   },
   {
     name: "Grace Luluma",
@@ -164,7 +173,7 @@ const TESTIMONIALS = [
     photo: "/testimonials/grace-lumumba.jpg",
     rating: 5,
     quote:
-      "J'invite mes collaborateurs et je fixe leurs rôles en un clic. VANNY a rendu mon salon plus serein, plus organisé et nettement plus professionnel.",
+      "J'invite mes coiffeuses et je leur attribue leurs rôles en un clic — chacune voit seulement ce qui lui concerne. Mon salon est devenu plus serein, et nos clients le remarquent.",
   },
 ] as const;
 
@@ -427,6 +436,22 @@ export default function HomePage() {
               </p>
             </div>
           </Reveal>
+
+          {/* Citation principale — captivante */}
+          <Reveal delay={0.12}>
+            <figure className="mx-auto mb-10 max-w-3xl text-center">
+              <span className="font-display text-7xl leading-[0.5] text-primary-soft" aria-hidden>
+                «
+              </span>
+              <blockquote className="-mt-6 font-display text-lg font-extrabold leading-snug tracking-tight text-foreground sm:text-xl">
+                {FEATURED.quote}
+              </blockquote>
+              <figcaption className="mt-5 text-sm font-semibold text-muted-foreground">
+                — {FEATURED.name}, {FEATURED.role}
+              </figcaption>
+            </figure>
+          </Reveal>
+
           <StaggerGroup className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {TESTIMONIALS.map((t) => (
               <motion.figure
@@ -440,7 +465,7 @@ export default function HomePage() {
                     <Star key={i} className="size-4 fill-warning text-warning" aria-hidden />
                   ))}
                 </div>
-                <blockquote className="mt-4 flex-1 text-sm leading-6 text-foreground">
+                <blockquote className="relative mt-4 flex-1 border-l-2 border-primary-soft pl-4 text-sm leading-6 text-foreground">
                   {t.quote}
                 </blockquote>
                 <figcaption className="mt-5 flex items-center gap-3 border-t border-border pt-4">
