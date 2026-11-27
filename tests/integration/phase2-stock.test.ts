@@ -529,7 +529,9 @@ describe("AC-7 — tenant isolation (RLS) on catalog and stock", () => {
     expect(mvRows.length).toBeGreaterThan(0);
     expect(mvRows.every((r: { org_id: string }) => String(r.org_id) === orgB)).toBe(true);
 
-    // A cannot operate AT B's branch (branch grant check, first gate) → 403.
+    // A (owner) is exempt from the branch-grant gate (ADR-0026), so cross-tenant
+    // isolation is enforced at the RLS branch check: B's branch is invisible to
+    // A → 404 (no leak, not an empty success).
     await expect(
       recordMovement(alice.headers, {
         type: "purchase",
@@ -537,7 +539,7 @@ describe("AC-7 — tenant isolation (RLS) on catalog and stock", () => {
         productId: createdB.id,
         qty: 1,
       }),
-    ).rejects.toMatchObject({ status: 403 });
+    ).rejects.toMatchObject({ status: 404 });
 
     // And B's product is invisible to A's own stock ops (RLS → 404, no leak).
     await expect(

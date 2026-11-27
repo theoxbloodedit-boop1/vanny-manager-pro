@@ -173,11 +173,12 @@ describe("onboarding", () => {
 
     bob = await signup("Bob Kalenga", "bob@example.cd");
 
-    // SECURITY GATE: an unverified email cannot even SEE its invitations.
-    // (Prevents registering an arbitrary email and harvesting invitations.)
-    await expect(myInvitations(bob.headers)).rejects.toThrow(
-      /verification/i,
-    );
+    // ADR-0031: the invitation list is accessible to the invited user even
+    // BEFORE email verification (so they can accept it). The invitation is the
+    // trust anchor; matching is scoped to THIS user's email/phone only, so
+    // registering a foreign email cannot harvest another org's invitations.
+    const early = await myInvitations(bob.headers);
+    expect(early).toHaveLength(1);
 
     // The recipient clicks the verification link (real signed-token flow).
     await verifyEmail("bob@example.cd");

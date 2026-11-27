@@ -100,6 +100,16 @@ export async function requireOperator(
       "Cette action est réservée aux opérateurs de la plateforme.",
     );
   }
+  // ADR-0033: the operator allowlist alone is not enough — the email must also
+  // be verified. Otherwise anyone who registers with an operator's email before
+  // the operator does would inherit cross-tenant platform access.
+  if (!user.emailVerified) {
+    throw new ApiError(
+      403,
+      "FORBIDDEN",
+      "Email de l'opérateur non vérifié — vérification requise pour la plateforme.",
+    );
+  }
   return { operatorId: user.id, operatorEmail: user.email };
 }
 

@@ -427,10 +427,10 @@ describe("ADR-0014 — secure invitation adaptation", () => {
     ).rejects.toThrow(/verified or manually approved/i);
   });
 
-  it("a manually-approved user still CANNOT view the invitation list (list stays strict)", async () => {
-    // Manually approved but email NOT verified → list-user-invitations remains
-    // hard-gated on emailVerified (owner condition). Acceptance works via the
-    // direct secure link, but the LIST does not.
+  it("a manually-approved user CAN view their invitation list (ADR-0031: list accessible)", async () => {
+    // ADR-0031: the invitation list is no longer email-gated. A manually
+    // approved (email unverified) user can read their own invitations so they
+    // can accept them. With no invitation held, the list is simply empty.
     const lc = await signup("List Check", "listcheck@example.cd");
     await applyManualApproval({
       operatorId: verifiedOperatorId("operator-list"),
@@ -439,7 +439,8 @@ describe("ADR-0014 — secure invitation adaptation", () => {
       reason: "identity confirmed via WhatsApp call (test)",
     });
     expect((await readFlags("listcheck@example.cd")).emailVerified).toBe(false);
-    await expect(myInvitations(lc.headers)).rejects.toThrow(/verification/i);
+    const list = await myInvitations(lc.headers);
+    expect(list).toEqual([]);
   });
 
   it("FINAL GUARDRAIL: a manually-approved user CANNOT accept ANOTHER org's invitation", async () => {
@@ -900,8 +901,11 @@ describe("ADR-0014 — permission isolation & approval-revocation effect", () =>
       ),
     ).rejects.toMatchObject({ reason: "NOT_A_MEMBER" });
 
-    // 3) Invitation list is strict (unverified) — 403.
-    await expect(myInvitations(eve.headers)).rejects.toThrow(/verification/i);
+    // 3) ADR-0031: the invitation list IS accessible to the invited user (so
+    //    she can accept it) — but she is not yet a member, so the business
+    //    access assertions above still hold.
+    const invs = await myInvitations(eve.headers);
+    expect(invs).toHaveLength(1);
 
     // 4) ADR-0020: before accepting, she has NO access (points 1-3 hold).
     //    But she CAN accept the invitation — the pending invitation IS the

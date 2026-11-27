@@ -296,7 +296,7 @@ export default function HomePage() {
 
       <main className="mx-auto max-w-6xl px-4 sm:px-6">
         {/* Hero — la réponse en 10 secondes */}
-        <section className="relative overflow-hidden grid items-center gap-10 py-14 md:grid-cols-2 md:gap-12 md:py-20">
+        <section className="relative overflow-hidden py-14 md:py-20">
           <div className="aurora" aria-hidden />
           <div className="relative-z grid w-full items-center gap-10 md:grid-cols-2 md:gap-12">
           <Reveal>
@@ -305,21 +305,22 @@ export default function HomePage() {
               Le SaaS de gestion pour vos commerces — conçu pour la RDC
             </span>
             <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl">
-              Gérez votre commerce,
+              Sachez enfin où vous en êtes :
               <br />
-              <span className="text-primary">tout en un seul espace.</span>
+              <span className="text-primary">caisse, stock et bénéfice, en un seul espace.</span>
             </h1>
             <p className="mt-5 max-w-md text-base leading-7 text-muted-foreground">
-              VANNY est une plateforme SaaS pour les petites et moyennes activités de
-              commerce. Une seule connexion, un contrôle total sur votre catalogue,
-              votre stock, vos équipes et vos succursales.
+              VANNY réunit vos ventes, votre stock et votre équipe dans une seule
+              application. Une caisse par succursale, des prix en USD et en CDF
+              jamais mélangés, et chaque vendeur ne voit que ce qu’il doit voir.
+              Gratuit pour démarrer.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <Link
                 href="/auth"
-                className="inline-flex min-h-12 items-center gap-2 rounded-control bg-primary px-6 text-sm font-bold text-white shadow-pop transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-float"
+                className="group inline-flex min-h-12 items-center gap-2 rounded-control bg-primary px-6 text-sm font-bold text-white shadow-pop transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-float"
               >
-                Commencer maintenant
+                Créer mon compte — gratuit
                 <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
               </Link>
               <Link
@@ -330,8 +331,9 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mt-7 text-xs font-medium text-muted-foreground">
-              Pharmacie · Bar · Restaurant · Salon · Boutique — chaque activité
-              est structurée et optimisée selon son métier.
+              Sans carte bancaire · Prêt en 2 minutes · Vos données sont cloisonnées :
+              aucune autre boutique ne peut les voir. Pharmacie · Bar · Restaurant ·
+              Salon · Boutique.
             </p>
           </Reveal>
           <Reveal variant="fade" delay={0.15}>
