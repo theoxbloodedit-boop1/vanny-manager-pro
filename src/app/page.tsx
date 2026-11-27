@@ -126,7 +126,7 @@ const LIVE = [
   "Tarifs normalisés USD / CDF, jamais convertis silencieusement",
   "Point de vente et caisses — USD et CDF séparés, jamais convertis",
   "Transferts de stock inter-succursales (atomic, entre succursales)",
-  "Mode hors-ligne : ventes enregistrées en attente, synchronisées au rebond",
+  "Mode hors-ligne testé sur appareil Android : ventes en attente, synchronisées au rebond",
 ];
 
 /**
