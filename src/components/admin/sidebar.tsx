@@ -62,7 +62,7 @@ export function AdminSidebar({
   onSignOut: () => void;
 }) {
   return (
-    <aside className="flex h-screen w-full flex-col border-r border-border bg-background lg:w-64 lg:shrink-0">
+    <aside className="hidden h-screen w-full flex-col border-r border-border bg-background lg:flex lg:w-64 lg:shrink-0">
       {/* Brand */}
       <div className="flex h-16 items-center gap-2.5 border-b border-border px-4">
         {logoUrl ? (
