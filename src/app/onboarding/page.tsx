@@ -103,7 +103,7 @@ export default function OnboardingPage() {
           firstBranchName,
         }),
       });
-      const data = (await res.json()) as { message?: string };
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
       if (!res.ok) throw new Error(data.message || "Création impossible");
       router.replace("/admin");
     } catch (err) {

@@ -124,9 +124,20 @@ interface OrgInvitation {
   createdAt: string;
 }
 
+/** Lecture robuste du corps JSON — gère les réponses vides (ex: 405). */
+async function readBody<T>(res: Response): Promise<T & { message?: string }> {
+  const text = await res.text();
+  if (!text) return {} as T & { message?: string };
+  try {
+    return JSON.parse(text) as T & { message?: string };
+  } catch {
+    return {} as T & { message?: string };
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path, { cache: "no-store" });
-  const data = (await res.json()) as T & { message?: string };
+  const data = await readBody<T>(res);
   if (!res.ok) throw new Error(data.message || "Requête impossible");
   return data;
 }
@@ -136,7 +147,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = (await res.json()) as T & { message?: string };
+  const data = await readBody<T>(res);
   if (!res.ok) throw new Error(data.message || "Action impossible");
   return data;
 }

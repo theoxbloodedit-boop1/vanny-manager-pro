@@ -52,7 +52,7 @@ interface Invitation {
 
 async function fetchMe(): Promise<Me> {
   const res = await fetch("/api/me", { cache: "no-store" });
-  return (await res.json()) as Me;
+  return (await res.json().catch(() => ({}))) as Me;
 }
 
 export default function PostAuthPage() {
@@ -75,8 +75,8 @@ export default function PostAuthPage() {
     queryKey: ["my-invitations"],
     queryFn: async (): Promise<Invitation[]> => {
       const res = await fetch("/api/invitations", { cache: "no-store" });
-      if (!res.ok) throw new Error((await res.json()).message);
-      const data = (await res.json()) as Invitation[];
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message);
+      const data = (await res.json().catch(() => ({}))) as Invitation[];
       return data.filter((i) => i.status === "pending");
     },
     enabled: !!me?.user?.emailVerified && !me?.organization,
@@ -93,7 +93,7 @@ export default function PostAuthPage() {
     try {
       const res = await fetch("/api/dev/verification-link", { cache: "no-store" });
       if (!res.ok) throw new Error("indisponible");
-      const data = (await res.json()) as { url: string };
+      const data = (await res.json().catch(() => ({}))) as { url: string };
       setDevUrl(data.url);
     } catch {
       setNotice(
@@ -123,7 +123,7 @@ export default function PostAuthPage() {
         body: JSON.stringify({ invitationId: inv.id }),
       });
       if (!res.ok) {
-        const data = (await res.json()) as { message: string };
+        const data = (await res.json().catch(() => ({}))) as { message: string };
         throw new Error(data.message);
       }
       queryClient.setQueryData<Me>(["me"], (old) =>

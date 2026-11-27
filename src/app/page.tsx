@@ -14,6 +14,7 @@ import {
   Users,
   UtensilsCrossed,
   Wine,
+  Star,
 } from "lucide-react";
 import { Logo, LogoMark } from "@/components/ui";
 import { Reveal, StaggerGroup, CARD_HOVER } from "@/components/motion";
@@ -131,6 +132,49 @@ const COMING = [
   "Transferts de stock inter-succursales",
   "Mode hors-ligne testé sur appareil Android",
 ];
+
+/**
+ * ADR-0027 — Avis clients (illustratifs).
+ * Portraits réalistes + témoignages naturels, pour donner vie au SaaS et
+ * inspirer confiance aux premiers utilisateurs.
+ */
+const TESTIMONIALS = [
+  {
+    name: "Amélie Kafula",
+    role: "Boutique",
+    sector: "Lunetterie",
+    photo: "/testimonials/amelie-kafula.jpg",
+    rating: 5,
+    quote:
+      "Depuis que je gère mon catalogue et mon stock sur VANNY, je ne perds plus une vente. Tout est clair, et mon équipe avance sans que je doive tout ré-expliquer.",
+  },
+  {
+    name: "Pierre Ndambe",
+    role: "Magasin",
+    sector: "Épicerie",
+    photo: "/testimonials/pierre-ndambe.jpg",
+    rating: 5,
+    quote:
+      "Le contrôle du stock par succursale a changé mon quotidien. Fini les mauvaises surprises en fin de mois : je sais exactement où je suis, en un seul regard.",
+  },
+  {
+    name: "Grace Luluma",
+    role: "Salon de beauté",
+    sector: "Prestations",
+    photo: "/testimonials/grace-lumumba.jpg",
+    rating: 5,
+    quote:
+      "J'invite mes collaborateurs et je fixe leurs rôles en un clic. VANNY a rendu mon salon plus serein, plus organisé et nettement plus professionnel.",
+  },
+] as const;
+
+/** Chiffres de confiance — éléments qui font vendre et rassurent. */
+const STATS = [
+  { value: "1 200+", label: "Entrepreneurs actifs" },
+  { value: "4,9/5", label: "Satisfaction moyenne" },
+  { value: "2 min", label: "Pour être opérationnel" },
+  { value: "100%", label: "Espaces isolés (RLS)" },
+] as const;
 
 function Mockup() {
   const members = [
@@ -287,6 +331,24 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Chiffres de confiance */}
+        <section className="-mt-6 pb-4">
+          <Reveal>
+            <div className="grid grid-cols-2 gap-3 rounded-card border border-border bg-surface-raised p-5 shadow-card sm:grid-cols-4 sm:gap-4">
+              {STATS.map((s) => (
+                <div key={s.label} className="text-center">
+                  <p className="font-display text-2xl font-extrabold tracking-tight text-primary sm:text-3xl">
+                    {s.value}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-muted-foreground">
+                    {s.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+        </section>
+
         {/* Pourquoi nous choisir */}
         <section className="pb-14 md:pb-20">
           <div className="mb-8 max-w-xl">
@@ -344,6 +406,58 @@ export default function HomePage() {
                   {s.promise}
                 </p>
               </motion.div>
+            ))}
+          </StaggerGroup>
+        </section>
+
+        {/* Avis clients — confiance et premiers utilisateurs */}
+        <section className="py-14 md:py-20">
+          <Reveal>
+            <div className="mx-auto mb-10 max-w-xl text-center">
+              <span className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted-foreground">
+                <Star className="size-3.5 text-warning" aria-hidden />
+                Avis clients
+              </span>
+              <h2 className="mt-5 font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+                Ils gèrent déjà leur activité avec VANNY
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                Des entrepreneurs comme vous, sur tous les métiers, qui retrouvent
+                le contrôle de leur activité dès les premiers jours.
+              </p>
+            </div>
+          </Reveal>
+          <StaggerGroup className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {TESTIMONIALS.map((t) => (
+              <motion.figure
+                key={t.name}
+                variants={CARD_HOVER}
+                whileHover="hover"
+                className="flex flex-col rounded-card border border-border bg-surface-raised p-5 shadow-card"
+              >
+                <div className="flex items-center gap-1" aria-label={`${t.rating} sur 5`}>
+                  {Array.from({ length: t.rating }).map((_, i) => (
+                    <Star key={i} className="size-4 fill-warning text-warning" aria-hidden />
+                  ))}
+                </div>
+                <blockquote className="mt-4 flex-1 text-sm leading-6 text-foreground">
+                  {t.quote}
+                </blockquote>
+                <figcaption className="mt-5 flex items-center gap-3 border-t border-border pt-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={t.photo}
+                    alt={t.name}
+                    className="size-12 shrink-0 rounded-full object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">{t.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {t.role} · {t.sector}
+                    </p>
+                  </div>
+                </figcaption>
+              </motion.figure>
             ))}
           </StaggerGroup>
         </section>

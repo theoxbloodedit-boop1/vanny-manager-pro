@@ -60,7 +60,7 @@ interface Approvals {
 
 async function fetchApprovals(): Promise<Approvals> {
   const res = await fetch("/api/operator/approvals", { cache: "no-store" });
-  const data = (await res.json()) as Approvals & { message?: string };
+  const data = (await res.json().catch(() => ({}))) as Approvals & { message?: string };
   if (!res.ok) {
     const err = new Error(data.message || "Accès impossible") as Error & {
       status?: number;
@@ -146,7 +146,7 @@ export default function OperatorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...target, action, reason }),
       });
-      const body = (await res.json()) as { message?: string };
+      const body = (await res.json().catch(() => ({}))) as { message?: string };
       if (!res.ok) throw new Error(body.message || "Action impossible");
       setConfirming(null);
       await qc.invalidateQueries({ queryKey: ["operator-approvals"] });
