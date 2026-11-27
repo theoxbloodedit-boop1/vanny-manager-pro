@@ -149,8 +149,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   owner: ALL,
   admin: ADMIN,
   manager: MANAGER,
-  cashier: ["cash.open", "cash.close", "cash.view", "sales.create", "sales.view", "customers.view"],
-  seller: ["sales.create", "sales.view", "customers.view", "products.view"],
+  cashier: ["cash.open", "cash.close", "cash.view", "sales.create", "sales.view", "customers.view", "customers.manage"],
+  seller: ["sales.create", "sales.view", "customers.view", "customers.manage", "products.view"],
   stock_manager: [
     "inventory.view",
     "inventory.adjust",

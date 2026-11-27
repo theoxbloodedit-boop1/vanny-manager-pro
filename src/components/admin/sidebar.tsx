@@ -7,10 +7,12 @@ import {
   LogOut,
   Palette,
   Package,
+  Receipt,
   Store,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { Logo } from "@/components/ui";
 
 /**
@@ -83,6 +85,13 @@ export function AdminSidebar({
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        <Link
+          href="/sales"
+          className="flex w-full items-center gap-3 rounded-control bg-primary-soft px-3 py-2.5 text-sm font-bold text-primary transition-colors hover:bg-primary"
+        >
+          <Receipt className="size-4.5 shrink-0" aria-hidden />
+          <span>Point de vente</span>
+        </Link>
         {NAV.map((item) => {
           const Icon = item.icon;
           const active = section === item.id;
