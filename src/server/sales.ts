@@ -1,4 +1,4 @@
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, gte, sql, desc, type SQL } from "drizzle-orm";
 import * as z from "zod";
 import { withTenantDb } from "../db/tenant";
 import { members, users } from "../db/schema/auth";
@@ -256,7 +256,15 @@ export async function createSale(headers: Headers, raw: unknown) {
 export async function listSales(headers: Headers, query: URLSearchParams) {
   const { orgId } = await requireActiveOrg(headers);
   const branchId = query.get("branchId");
+  const today = query.get("today") === "1";
   const limit = Math.min(Math.max(parseInt(query.get("limit") ?? "30", 10) || 30, 1), 100);
+  const conditions: SQL[] = [];
+  if (branchId) conditions.push(eq(sales.branchId, branchId));
+  if (today) {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    conditions.push(gte(sales.createdAt, start));
+  }
   return withTenantDb(orgId, (db) =>
     db
       .select({
@@ -271,8 +279,34 @@ export async function listSales(headers: Headers, query: URLSearchParams) {
         createdAt: sales.createdAt,
       })
       .from(sales)
-      .where(branchId ? eq(sales.branchId, branchId) : undefined)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(sales.createdAt))
       .limit(limit),
   );
+}
+
+/**
+ * Aggregate the active org's sales for the CURRENT DAY: number of sales and
+ * total amount sold (in minor units). Used by the owner's overview/CRM panel.
+ */
+export async function salesTodayStats(headers: Headers, query: URLSearchParams) {
+  const { orgId } = await requireActiveOrg(headers);
+  const branchId = query.get("branchId");
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const where = and(
+    gte(sales.createdAt, start),
+    ...(branchId ? [eq(sales.branchId, branchId)] : []),
+  );
+  const row = await withTenantDb(orgId, (db) =>
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+        totalMinor: sql<number>`coalesce(sum(${sales.totalMinor}), 0)::bigint`,
+      })
+      .from(sales)
+      .where(where),
+  );
+  const r = row[0] ?? { count: 0, totalMinor: 0 };
+  return { count: Number(r.count), totalMinor: Number(r.totalMinor) };
 }

@@ -14,6 +14,7 @@ import {
   Package,
   KeyRound,
   Banknote,
+  Trash2,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import {
@@ -124,6 +125,34 @@ interface OrgInvitation {
   createdAt: string;
 }
 
+interface SaleRow {
+  id: string;
+  branchId: string;
+  sellerName: string | null;
+  totalMinor: number;
+  currency: string;
+  paymentMethod: string;
+  status: string;
+  createdAt: string;
+}
+
+/** Format a minor-unit amount (e.g. 12500 → "125,00 USD"). */
+function formatMoney(minor: number, currency: string): string {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(minor / 100);
+}
+
+/** Format a timestamp as a short locale time (HH:MM). */
+function formatTime(iso: string): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
 /** Lecture robuste du corps JSON — gère les réponses vides (ex: 405). */
 async function readBody<T>(res: Response): Promise<T & { message?: string }> {
   const text = await res.text();
@@ -161,6 +190,12 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok) throw new Error(data.message || "Action impossible");
   return data;
 }
+async function del<T>(path: string): Promise<T> {
+  const res = await fetch(path, { method: "DELETE" });
+  const data = await readBody<T>(res);
+  if (!res.ok) throw new Error(data.message || "Action impossible");
+  return data;
+}
 
 export default function AdminPage() {
   const router = useRouter();
@@ -193,6 +228,19 @@ export default function AdminPage() {
   const products = useQuery({
     queryKey: ["products-count"],
     queryFn: () => get<{ total: number }>("/api/products?includeInactive=1"),
+    enabled: !!me.data?.organization,
+  });
+
+  // Owner CRM: today's sales aggregate + list.
+  const salesToday = useQuery({
+    queryKey: ["sales-today"],
+    queryFn: () => get<{ count: number; totalMinor: number }>("/api/sales?stats=today"),
+    enabled: !!me.data?.organization,
+  });
+  const salesTodayList = useQuery({
+    queryKey: ["sales-today-list"],
+    queryFn: () =>
+      get<SaleRow[]>("/api/sales?today=1&limit=8"),
     enabled: !!me.data?.organization,
   });
 
@@ -364,6 +412,46 @@ export default function AdminPage() {
                   tone={pendingCount > 0 ? "warning" : "neutral"}
                 />
               </div>
+              <Card
+                title="Ventes du jour"
+                subtitle="Le suivi de votre activité commerciale du jour."
+                icon={Banknote}
+              >
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="rounded-control bg-surface-inset p-3">
+                    <p className="text-xs text-muted-foreground">Nombre de ventes</p>
+                    <p className="mt-1 text-2xl font-extrabold tabular-nums">
+                      {salesToday.data?.count ?? "—"}
+                    </p>
+                  </div>
+                  <div className="col-span-2 rounded-control bg-surface-inset p-3">
+                    <p className="text-xs text-muted-foreground">Montant total vendu</p>
+                    <p className="mt-1 text-2xl font-extrabold tabular-nums">
+                      {salesToday.data
+                        ? formatMoney(salesToday.data.totalMinor, org.baseCurrency)
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+                {salesTodayList.data && salesTodayList.data.length > 0 ? (
+                  <ul className="mt-4 space-y-2 border-t border-border pt-4">
+                    {salesTodayList.data.map((s) => (
+                      <li key={s.id} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="min-w-0 truncate text-muted-foreground">
+                          {s.sellerName || "Vendeur"} · {formatTime(s.createdAt)}
+                        </span>
+                        <span className="tabular-nums font-semibold">
+                          {formatMoney(s.totalMinor, s.currency)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    Aucune vente enregistrée ce jour.
+                  </p>
+                )}
+              </Card>
               <Card title="Accès rapide" subtitle="Allez à la section souhaitée." icon={KeyRound}>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {(
@@ -535,7 +623,14 @@ export default function AdminPage() {
                     <Button
                       loading={busy === "invite"}
                       onClick={() => {
-                        const email = invEmail;
+                        const email = invEmail.trim();
+                        if (!email) {
+                          setErrors((e) => ({
+                            ...e,
+                            invite: "Veuillez saisir l'email de la personne à inviter avant d'envoyer.",
+                          }));
+                          return;
+                        }
                         const phone = normalizeWaPhone(invPhone);
                         run(
                           "invite",
@@ -655,24 +750,46 @@ export default function AdminPage() {
                             ) : null}
                           </div>
                           {canManage && (
-                            <Button
-                              variant="outline"
-                              className="h-8 px-2 text-xs"
-                              onClick={() => {
-                                setEditBranch({ id: b.id, name: b.name, address: b.address ?? "", phone: b.phone ?? "" });
-                                setEditName(b.name);
-                                setEditAddress(b.address ?? "");
-                                setEditPhone(b.phone ?? "");
-                                setErrors((e) => ({ ...e, branch: "" }));
-                              }}
-                            >
-                              Modifier
-                            </Button>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <Button
+                                variant="outline"
+                                className="h-8 px-2 text-xs"
+                                onClick={() => {
+                                  setEditBranch({ id: b.id, name: b.name, address: b.address ?? "", phone: b.phone ?? "" });
+                                  setEditName(b.name);
+                                  setEditAddress(b.address ?? "");
+                                  setEditPhone(b.phone ?? "");
+                                  setErrors((e) => ({ ...e, branch: "" }));
+                                }}
+                              >
+                                Modifier
+                              </Button>
+                              <Button
+                                variant="danger"
+                                className="h-8 gap-1.5 px-2 text-xs"
+                                onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      `Supprimer définitivement la succursale « ${b.name} » ? L'historique des ventes de cette succursale sera également supprimé.`,
+                                    )
+                                  )
+                                    return;
+                                  run(
+                                    "delete-branch",
+                                    () => del(`/api/branches/${b.id}`),
+                                  );
+                                }}
+                              >
+                                <Trash2 className="size-3.5" aria-hidden />
+                                Supprimer
+                              </Button>
+                            </div>
                           )}
                         </li>
                       ))}
                     </ul>
                   )}
+                  {canManage && <ApiErrorText error={errors["delete-branch"]} />}
                   {canManage && editBranch && (
                     <div className="rounded-control border border-primary/30 bg-surface-inset p-3">
                       <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">

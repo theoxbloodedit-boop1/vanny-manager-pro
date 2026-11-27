@@ -5,6 +5,8 @@ import { getAuth } from "../auth";
 import { withTenantDb } from "../db/tenant";
 import { branches, branchAccess } from "../db/schema/org";
 import { invitations, members, users } from "../db/schema/auth";
+import { cashSessions } from "../db/schema/cash";
+import { customers } from "../db/schema/sales";
 import { uuidv7 } from "../lib/uuid";
 import { ApiError } from "./errors";
 import { isManuallyApproved } from "./manual-approval";
@@ -109,6 +111,40 @@ export async function updateBranch(headers: Headers, raw: unknown) {
   if (!changed) {
     throw new ApiError(404, "NOT_FOUND", "Succursale introuvable.");
   }
+  return { ok: true };
+}
+
+/**
+ * Delete a branch (shop) permanently.
+ *
+ * Sales, cash registers and branch-access rows cascade automatically. Two
+ * foreign keys do NOT cascade, so we clear them first to make the delete
+ * atomic and never fail halfway: cash sessions are dropped (a closed shop has
+ * no open sessions) and customers lose their branch link (kept, branchless).
+ */
+const deleteBranchBody = z.object({ id: z.string().uuid() });
+
+export async function deleteBranch(headers: Headers, raw: unknown) {
+  const body = deleteBranchBody.parse(raw);
+  const { userId, orgId } = await requireActiveOrg(headers);
+
+  await withTenantDb(orgId, async (db) => {
+    await authorize(db, { userId, permission: "branches.manage" });
+    const rows = await db
+      .select({ id: branches.id })
+      .from(branches)
+      .where(eq(branches.id, body.id));
+    if (rows.length === 0) {
+      throw new ApiError(404, "NOT_FOUND", "Succursale introuvable.");
+    }
+    await db.delete(cashSessions).where(eq(cashSessions.branchId, body.id));
+    await db
+      .update(customers)
+      .set({ branchId: null })
+      .where(eq(customers.branchId, body.id));
+    await db.delete(branches).where(eq(branches.id, body.id));
+  });
+
   return { ok: true };
 }
 

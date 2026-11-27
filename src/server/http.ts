@@ -27,7 +27,14 @@ export function toHttpError(e: unknown): HttpErrorInfo {
     return { status: e.status, error: e.reason, message: e.message };
   }
   if (e instanceof ZodError) {
-    return { status: 400, error: "VALIDATION", message: "Invalid request data." };
+    const first = e.issues[0];
+    const where = first?.path?.join(".") || "données";
+    const detail = first?.message ? ` : ${first.message}` : "";
+    return {
+      status: 400,
+      error: "VALIDATION",
+      message: `Données invalides sur ${where}.${detail}`,
+    };
   }
 
   // Better Auth / better-call errors: { statusCode, body: { code, message } }.
