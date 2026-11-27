@@ -192,9 +192,33 @@ export function ApiErrorText({ error }: { error?: string | undefined }) {
 export function LogoMark({ className = "size-10" }: { className?: string }) {
   return (
     <span
-      className={`flex items-center justify-center rounded-xl bg-primary font-bold text-white shadow-card ${className}`}
+      className={`flex items-center justify-center rounded-xl bg-primary shadow-card ${className}`}
+      aria-hidden
     >
-      <span className="text-[1.05em] leading-none">V</span>
+      <svg
+        viewBox="0 0 40 40"
+        className="h-[1.05em] w-[1.05em]"
+        fill="none"
+        fillRule="evenodd"
+      >
+        {/* V dynamique */}
+        <path
+          d="M10.5 14 L20 27.5 L29.5 14"
+          stroke="#ffffff"
+          strokeWidth="3.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Flèche de croissance à la pointe */}
+        <path
+          d="M29.5 14 L33.5 10.5 M29.5 14 L33.5 17.5"
+          stroke="#ffffff"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.9"
+        />
+      </svg>
     </span>
   );
 }
@@ -239,9 +263,9 @@ export function Avatar({ name, className = "size-9" }: { name: string; className
   return (
     <span
       aria-hidden
-      className={`flex shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-hover font-bold text-white shadow-card ring-1 ring-white/20 ${className}`}
     >
-      {initials || "?"}
+      <span className="leading-none drop-shadow-sm">{initials || "?"}</span>
     </span>
   );
 }
