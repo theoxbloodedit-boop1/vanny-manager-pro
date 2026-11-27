@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   useQuery,
   useMutation,
@@ -18,6 +18,9 @@ import {
   Receipt,
   Wifi,
   Package,
+  CircleDollarSign,
+  CloudOff,
+  CloudCheck,
 } from "lucide-react";
 import {
   Button,
@@ -73,7 +76,35 @@ interface Sale {
   createdAt: string;
 }
 
-const CURRENCY = "CDF";
+type Currency = "USD" | "CDF";
+const CURRENCIES: Currency[] = ["USD", "CDF"];
+
+interface PendingSale {
+  branchId: string;
+  currency: Currency;
+  paymentMethod: string;
+  customerId?: string | undefined;
+  customerName: string;
+  customerPhone?: string | undefined;
+  items: SaleItem[];
+}
+
+/** Queue hors-ligne : ventes enregistrées sans réseau, synchronisées au rebond. */
+const QUEUE_KEY = "vanny:sales-queue:v1";
+
+function readQueue(): PendingSale[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(window.localStorage.getItem(QUEUE_KEY) ?? "[]") as PendingSale[];
+  } catch {
+    return [];
+  }
+}
+
+function writeQueue(items: PendingSale[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
+}
 
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(path, { cache: "no-store" });
@@ -92,10 +123,6 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-function formatAmount(minor: number): string {
-  return new Intl.NumberFormat("fr-FR").format(minor) + " " + CURRENCY;
-}
-
 export default function SalesPage() {
   const qc = useQueryClient();
 
@@ -108,6 +135,51 @@ export default function SalesPage() {
   const [error, setError] = useState("");
   const [printer, setPrinter] = useState<PrinterDevice | null>(null);
   const [printerName, setPrinterName] = useState<string>("");
+  const [currency, setCurrency] = useState<Currency>("CDF");
+  const [online, setOnline] = useState<boolean>(
+    () => (typeof navigator === "undefined" ? true : navigator.onLine),
+  );
+  const [pendingCount, setPendingCount] = useState<number>(
+    () => (typeof window === "undefined" ? 0 : readQueue().length),
+  );
+
+  const formatAmount = (minor: number) =>
+    new Intl.NumberFormat("fr-FR").format(minor) + " " + currency;
+
+  // Synchronise la queue hors-ligne au rebond de la connexion (dans un callback
+  // d'evenement, pas dans le corps de l'effect, pour eviter les renders en cascade).
+  const flushQueue = useCallback(async () => {
+    const queue = readQueue();
+    if (queue.length === 0) return;
+    setPendingCount(queue.length);
+    for (const sale of queue) {
+      try {
+        await postJson("/api/sales", sale);
+        writeQueue(readQueue().filter((x) => x !== sale));
+      } catch {
+        break;
+      }
+    }
+    setPendingCount(readQueue().length);
+  }, []);
+
+  useEffect(() => {
+    const onOnline = () => {
+      setOnline(true);
+      void flushQueue();
+    };
+    const onOffline = () => setOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [flushQueue]);
+
+  const flushQueueMut = useMutation({
+    mutationFn: async () => flushQueue(),
+  });
 
   const branches = useQuery<Branch[]>({
     queryKey: ["branches"],
@@ -128,7 +200,10 @@ export default function SalesPage() {
   });
 
   const productPrice = (p: Product): number => {
-    const price = p.prices?.find((pr) => pr.currency === CURRENCY) ?? p.prices?.[0];
+    const price =
+      p.prices?.find((pr) => pr.currency === currency) ??
+      p.prices?.find((pr) => pr.currency === "CDF") ??
+      p.prices?.[0];
     return price ? Number(price.amountMinor) : 0;
   };
 
@@ -214,15 +289,32 @@ export default function SalesPage() {
       if (!branchId) throw new Error("Choisissez une succursale.");
       if (cart.length === 0) throw new Error("Ajoutez au moins un article.");
       if (!customerName) throw new Error("Saisissez le nom du client.");
-      return postJson("/api/sales", {
+      const payload: PendingSale = {
         branchId,
-        currency: CURRENCY,
+        currency,
         paymentMethod: "cash",
         customerId: customerId ?? undefined,
         customerName,
         customerPhone: customerPhone || undefined,
         items: cart,
-      });
+      };
+      // Hors-ligne : la vente est enregistrée en attente et synchronisée au rebond.
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        writeQueue([...readQueue(), payload]);
+        setPendingCount(readQueue().length);
+        return { queued: true };
+      }
+      try {
+        return await postJson("/api/sales", payload);
+      } catch (e) {
+        // Erreur réseau (TypeError) : on met en attente pour synchroniser plus tard.
+        if (e instanceof TypeError) {
+          writeQueue([...readQueue(), payload]);
+          setPendingCount(readQueue().length);
+          return { queued: true };
+        }
+        throw e;
+      }
     },
     onSuccess: async () => {
       const sold = cart;
@@ -260,6 +352,49 @@ export default function SalesPage() {
             <Badge tone="neutral">Imprimante Bluetooth</Badge>
           </div>
         </div>
+      </Reveal>
+
+      {/* Caisse : devise + statut hors-ligne */}
+      <Reveal delay={0.04}>
+        <Card title="Caisse" icon={CircleDollarSign}
+          subtitle="USD et CDF gérés séparément — jamais convertis silencieusement.">
+          <div className="space-y-3">
+            <Field label="Devise de la caisse">
+              <Select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c === "CDF" ? "CDF — franc congolais" : "USD — dollar américain"}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <div className="flex items-center justify-between rounded-control bg-surface-inset p-2">
+              <div className="flex items-center gap-2">
+                {online ? (
+                  <CloudCheck className="size-4 text-success" />
+                ) : (
+                  <CloudOff className="size-4 text-warning" />
+                )}
+                <span className="text-sm font-semibold">
+                  {online
+                    ? "En ligne — synchronisation automatique"
+                    : "Hors-ligne — ventes enregistrées en attente"}
+                </span>
+              </div>
+              {pendingCount > 0 ? (
+                <Button
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => flushQueueMut.mutate()}
+                  disabled={!online || flushQueueMut.isPending}
+                >
+                  <RefreshCw className={`size-4 ${flushQueueMut.isPending ? "animate-spin" : ""}`} />
+                  Synchroniser ({pendingCount})
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </Card>
       </Reveal>
 
       {/* Sélection de succursale */}

@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Banknote,
   Check,
-  Clock,
   KeyRound,
   Pill,
   ShieldCheck,
@@ -125,12 +124,9 @@ const LIVE = [
   "Tableau de bord admin complet : catalogue, stock, équipes, succursales, marque",
   "Branding personnalisable : nom, logo et couleur de votre activité",
   "Tarifs normalisés USD / CDF, jamais convertis silencieusement",
-];
-
-const COMING = [
-  "Point de vente et caisses (USD et CDF séparés)",
-  "Transferts de stock inter-succursales",
-  "Mode hors-ligne testé sur appareil Android",
+  "Point de vente et caisses — USD et CDF séparés, jamais convertis",
+  "Transferts de stock inter-succursales (atomic, entre succursales)",
+  "Mode hors-ligne : ventes enregistrées en attente, synchronisées au rebond",
 ];
 
 /**
@@ -531,28 +527,6 @@ export default function HomePage() {
                     className="flex items-start gap-2.5 text-sm leading-6 text-foreground"
                   >
                     <Check className="mt-1 size-4 shrink-0 text-success" aria-hidden />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </Reveal>
-            <Reveal delay={0.1} className="rounded-card border border-border bg-surface p-5 transition-all duration-300 hover:-translate-y-1">
-              <div className="mb-4 flex items-center gap-2.5">
-                <span className="flex size-9 items-center justify-center rounded-control bg-surface-inset text-muted-foreground">
-                  <Clock className="size-4.5" aria-hidden />
-                </span>
-                <h2 className="font-bold tracking-tight">En préparation</h2>
-                <span className="rounded-pill bg-surface-inset px-2.5 py-0.5 text-[0.65rem] font-bold text-muted-foreground">
-                  pas encore utilisable
-                </span>
-              </div>
-              <ul className="space-y-2.5">
-                {COMING.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-2.5 text-sm leading-6 text-muted-foreground"
-                  >
-                    <Clock className="mt-1 size-4 shrink-0" aria-hidden />
                     {item}
                   </li>
                 ))}
