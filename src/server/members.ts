@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql, desc } from "drizzle-orm";
 import * as z from "zod";
 import { getAuthDb } from "../auth/db";
 import { getAuth } from "../auth";
@@ -361,6 +361,26 @@ export async function myInvitations(headers: Headers) {
   const auth = getAuth();
   const session = await auth.api.getSession({ headers });
   if (!session?.user) throw new ApiError(401, "UNAUTHORIZED", "Authentification requise");
+
+  // ADR-0020: the invitation is the trust anchor. `listUserInvitations` is
+  // email-gated, which blocks an unverified invitee from ever seeing (and
+  // thus accepting) their invitation. Read the invitation rows directly by
+  // the session email so an unverified user holding a valid pending
+  // invitation can accept it (the accept gate already permits this).
+  if (session.user.email) {
+    const db = getAuthDb();
+    return db
+      .select({
+        id: invitations.id,
+        organizationId: invitations.organizationId,
+        email: invitations.email,
+        role: invitations.role,
+        status: invitations.status,
+      })
+      .from(invitations)
+      .where(eq(invitations.email, session.user.email))
+      .orderBy(desc(invitations.createdAt));
+  }
   return auth.api.listUserInvitations({ headers });
 }
 

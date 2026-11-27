@@ -79,7 +79,7 @@ export default function PostAuthPage() {
       const data = (await res.json().catch(() => ({}))) as Invitation[];
       return data.filter((i) => i.status === "pending");
     },
-    enabled: !!me?.user?.emailVerified && !me?.organization,
+    enabled: !!me?.user && !me?.organization,
   });
 
   // Already have an organization → straight to the admin shell.
@@ -150,6 +150,7 @@ export default function PostAuthPage() {
 
   const isPhoneUser = !!me.user?.phone;
   const verified = !!me.user?.emailVerified || !!me.user?.manuallyApproved;
+  const hasInvitation = invitations.data && invitations.data.length > 0;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-5 p-6">
@@ -166,7 +167,7 @@ export default function PostAuthPage() {
         </p>
       </header>
 
-      {!verified ? (
+      {!verified && !hasInvitation ? (
         isPhoneUser ? (
           <Card
             title="Votre compte est en attente"
